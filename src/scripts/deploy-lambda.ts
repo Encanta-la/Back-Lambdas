@@ -230,9 +230,10 @@ async function deployLambda(
   );
 
   try {
-    const shouldContinue = await showProgress(
-      () => checkAndUpdateVersion(lambdaPath, envConfig.stackName),
-      'Checking version'
+    logger.info('Checking version...');
+    const shouldContinue = await checkAndUpdateVersion(
+      lambdaPath,
+      envConfig.stackName
     );
 
     if (!shouldContinue) {
