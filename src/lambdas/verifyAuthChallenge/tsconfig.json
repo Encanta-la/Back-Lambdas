@@ -19,6 +19,6 @@
     "typeRoots": ["./node_modules/@types"],  
     "outDir": "dist",  
     "rootDir": "src"  
-  },  
-  "exclude": ["node_modules", "dist", "test"]  
+  }, 
+  "exclude": ["node_modules", "dist", "test", "**/*.test.ts", "**/__tests__/*"]  
 }
