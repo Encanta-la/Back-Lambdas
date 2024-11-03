@@ -31,17 +31,20 @@ const sns = captureAWSv3Client(
   })
 );
 
-const maskPhoneNumber = (phoneNumber: string): string => {
+export const maskPhoneNumber = (phoneNumber: string): string => {
   const countryCode = phoneNumber.match(/^\+\d{2}/)?.[0] ?? '';
   const lastFourDigits = phoneNumber.slice(-4);
   const maskLength = phoneNumber.length - countryCode.length - 4;
   return `${countryCode}${'X'.repeat(maskLength)}${lastFourDigits}`;
 };
 
-const generateSecretCode = (): string =>
+export const generateSecretCode = (): string =>
   Math.floor(100000 + Math.random() * 900000).toString();
 
-const sendSMSCode = async (phone: string, code: string): Promise<void> => {
+export const sendSMSCode = async (
+  phone: string,
+  code: string
+): Promise<void> => {
   const startTime = performance.now();
   try {
     await sns.publish({
