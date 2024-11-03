@@ -110,6 +110,11 @@ Antes de começar, certifique-se de ter instalado:
 É necessário configurar perfis AWS CLI para diferentes ambientes:
 
 ```bash
+# Para configurar perfis, prefira o AWS SSO
+aws configure sso
+
+# Caso não tenha acesso ao AWS SSO, siga o procedimento abaixo
+
 # Configurar Perfil de Desenvolvimento
 aws configure --profile pgcdev
 # Digite seu AWS Access Key ID
