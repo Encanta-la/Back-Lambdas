@@ -220,9 +220,23 @@ async function deployLambda(
 ) {
   const lambdaPath = path.join(getProjectRoot(), 'src', 'lambdas', lambdaName);
 
+  // Primeiro checkAndUpdateVersion
+  logger.info('Checking version...');
+  const shouldContinue = await checkAndUpdateVersion(
+    lambdaPath,
+    envConfig.stackName
+  );
+
+  if (!shouldContinue) {
+    logger.warning('Deployment cancelled');
+    return;
+  }
+
+  // Recarrega o package.json APÓS a atualização da versão
   const packageJson = JSON.parse(
     fs.readFileSync(path.join(lambdaPath, 'package.json'), 'utf-8')
   );
+
   DeploymentMetrics.startDeploy(
     lambdaName,
     envConfig.stackName,
@@ -230,17 +244,6 @@ async function deployLambda(
   );
 
   try {
-    logger.info('Checking version...');
-    const shouldContinue = await checkAndUpdateVersion(
-      lambdaPath,
-      envConfig.stackName
-    );
-
-    if (!shouldContinue) {
-      logger.warning('Deployment cancelled');
-      return;
-    }
-
     logger.info(`Deploying lambda: ${lambdaName} to ${envConfig.stackName}`);
 
     if (deployConfig.cleanupImages) {

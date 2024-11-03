@@ -1,6 +1,6 @@
 {
   "name": "verify-auth-challenge",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Lambda function to verify auth challenge",
   "main": "dist/index.js",
   "scripts": {
