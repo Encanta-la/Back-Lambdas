@@ -1,8 +1,7 @@
 # Estágio de build  
 FROM public.ecr.aws/lambda/nodejs:20 AS builder  
 
-# Define o diretório de trabalho  
-WORKDIR ${LAMBDA_TASK_ROOT}  
+WORKDIR /app  
 
 # Copia arquivos de dependência  
 COPY package*.json ./  
@@ -20,14 +19,12 @@ RUN npm ci && \
   rm -rf node_modules && \
   npm ci --production  
 
-# Remove arquivos desnecessários  
-RUN rm -rf src/ tsconfig.json package*.json  
-
-# Estágio final - usando a imagem base oficial do Lambda  
+# Estágio final  
 FROM public.ecr.aws/lambda/nodejs:20  
 
 # Copia apenas os arquivos necessários do estágio de build  
-COPY --from=builder ${LAMBDA_TASK_ROOT} ${LAMBDA_TASK_ROOT}  
+COPY --from=builder /app/dist/ ${LAMBDA_TASK_ROOT}/  
+COPY --from=builder /app/node_modules/ ${LAMBDA_TASK_ROOT}/node_modules/  
 
 # Configura o handler  
 CMD [ "index.handler" ]
