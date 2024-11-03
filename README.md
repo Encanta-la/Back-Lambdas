@@ -37,15 +37,46 @@ PrimeLambdas/
 ## Fluxo de Deploy
 
 ```mermaid
-graph TD
-    A[Início do Deploy] --> B[Login no ECR]
-    B --> C[Build da Imagem Docker]
-    C --> D[Tag da Imagem]
-    D --> E[Push para ECR]
-    E --> F[Deploy Concluído]
+sequenceDiagram
+    participant Dev as Desenvolvedor
+    participant CLI as AWS CLI
+    participant Docker
+    participant ECR as Amazon ECR
 
-    style A fill:#f9f,stroke:#333,stroke-width:4px
-    style F fill:#9f9,stroke:#333,stroke-width:4px
+    Dev->>CLI: Inicia Deploy
+
+    CLI->>ECR: Tenta Login ECR
+    alt Falha no Login
+        ECR-->>CLI: Erro de Autenticação
+        CLI-->>Dev: Erro: "Failed to login to ECR"
+    end
+
+    CLI->>Docker: Tenta Login Docker
+    alt Falha no Login Docker
+        Docker-->>CLI: Erro de Autenticação
+        CLI-->>Dev: Erro: "Failed to docker login"
+    end
+
+    CLI->>Docker: Build Image
+    alt Falha no Build
+        Docker-->>CLI: Erro de Build
+        CLI-->>Dev: Erro: "Failed to build image"
+    end
+
+    Docker->>Docker: Tag Image
+    alt Falha no Tag
+        Docker-->>CLI: Erro de Tag
+        CLI-->>Dev: Erro: "Failed to tag image with latest"
+    end
+
+    Docker->>ECR: Push Image
+    alt Falha no Push
+        ECR-->>CLI: Erro de Push
+        CLI-->>Dev: Erro: "Failed to push latest image"
+    end
+
+    ECR-->>Dev: Deploy Concluído com Sucesso
+    Note over Dev,ECR: Console: Successfully deployed {lambdaName} to {stackName}
 ```
 
 ## Processo de Build e Deploy
