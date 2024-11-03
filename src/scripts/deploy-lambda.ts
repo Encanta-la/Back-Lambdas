@@ -231,7 +231,7 @@ async function deployLambda(
 
   try {
     const shouldContinue = await showProgress(
-      checkAndUpdateVersion(lambdaPath, envConfig.stackName),
+      () => checkAndUpdateVersion(lambdaPath, envConfig.stackName),
       'Checking version'
     );
 
@@ -307,7 +307,10 @@ async function deployLambda(
     DeploymentMetrics.endDeploy(true);
   } catch (error) {
     DeploymentMetrics.endDeploy(false);
-    throw error;
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error(String(error));
   }
 }
 
