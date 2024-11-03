@@ -15,7 +15,6 @@ import { prompt } from 'enquirer';
 import { logger } from '../utils/logger';
 
 import * as ora from 'ora';
-import { DeployProgress } from '../utils/deployProgress';
 
 interface Args {
   profile: string;
@@ -219,18 +218,6 @@ async function deployLambda(
   lambdaName: string,
   repositoryUri: string
 ) {
-  const deploySteps = [
-    'Checking version',
-    'Cleanup',
-    'ECR Login',
-    'Building image',
-    'Tagging images',
-    'Pushing to ECR',
-    'Backup tags',
-    'Finishing up',
-  ];
-
-  const progress = new DeployProgress(deploySteps);
   const lambdaPath = path.join(getProjectRoot(), 'src', 'lambdas', lambdaName);
 
   const packageJson = JSON.parse(
@@ -243,75 +230,72 @@ async function deployLambda(
   );
 
   try {
-    // Versão
-    progress.updateCurrentStep('Checking current version');
+    logger.info('Checking version...');
     const shouldContinue = await checkAndUpdateVersion(
       lambdaPath,
       envConfig.stackName
     );
 
     if (!shouldContinue) {
-      progress.complete();
       logger.warning('Deployment cancelled');
       return;
     }
-    progress.next();
 
     logger.info(`Deploying lambda: ${lambdaName} to ${envConfig.stackName}`);
 
-    // Cleanup
     if (deployConfig.cleanupImages) {
-      progress.updateCurrentStep('Cleaning old images');
-      await cleanupDocker(lambdaName);
+      await showProgress(cleanupDocker(lambdaName), 'Cleaning up old images');
     }
-    progress.next();
 
-    // Login
-    progress.updateCurrentStep('Authenticating with ECR');
-    await executeCommand(
-      `aws ecr get-login-password --region ${envConfig.region} --profile ${profile}`
+    await showProgress(
+      executeCommand(
+        `aws ecr get-login-password --region ${envConfig.region} --profile ${profile}`
+      ),
+      'Logging into ECR'
     );
-    await executeCommand(
-      `aws ecr get-login-password --region ${envConfig.region} --profile ${profile} | docker login --username AWS --password-stdin ${envConfig.account}.dkr.ecr.${envConfig.region}.amazonaws.com`
-    );
-    progress.next();
 
-    // Build
-    progress.updateCurrentStep(`Building ${lambdaName}`);
-    await executeCommand(
-      `docker build -t ${lambdaName.toLowerCase()} ${lambdaPath}`
+    await showProgress(
+      executeCommand(
+        `aws ecr get-login-password --region ${envConfig.region} --profile ${profile} | docker login --username AWS --password-stdin ${envConfig.account}.dkr.ecr.${envConfig.region}.amazonaws.com`
+      ),
+      'Docker login'
     );
-    progress.next();
 
-    // Tag
+    logger.info(`Building from path: ${lambdaPath}`);
+    await showProgress(
+      executeCommand(
+        `docker build -t ${lambdaName.toLowerCase()} ${lambdaPath}`
+      ),
+      'Building Docker image'
+    );
+
     const version = packageJson.version;
     const gitSha = executeCommandWithOutput('git rev-parse --short HEAD');
-    progress.updateCurrentStep('Creating tags');
-    await executeCommand(
-      `docker tag ${lambdaName.toLowerCase()}:latest ${repositoryUri}:latest`
-    );
-    await executeCommand(
-      `docker tag ${lambdaName.toLowerCase()}:latest ${repositoryUri}:v${version}`
-    );
-    await executeCommand(
-      `docker tag ${lambdaName.toLowerCase()}:latest ${repositoryUri}:sha-${gitSha}`
-    );
-    progress.next();
+    await showProgress(async () => {
+      await executeCommand(
+        `docker tag ${lambdaName.toLowerCase()}:latest ${repositoryUri}:latest`
+      );
+      await executeCommand(
+        `docker tag ${lambdaName.toLowerCase()}:latest ${repositoryUri}:v${version}`
+      );
+      await executeCommand(
+        `docker tag ${lambdaName.toLowerCase()}:latest ${repositoryUri}:sha-${gitSha}`
+      );
+    }, 'Tagging images');
 
-    // Push
-    progress.updateCurrentStep('Pushing to ECR');
-    await executeCommand(`docker push --all-tags ${repositoryUri}`);
-    progress.next();
+    logger.info('Pushing all tags to repository...');
+    await showProgress(
+      executeCommand(`docker push --all-tags ${repositoryUri}`),
+      'Pushing images to ECR'
+    );
 
-    // Backup
     if (deployConfig.backupTags) {
-      progress.updateCurrentStep('Creating backup');
-      await backupTags(repositoryUri, version);
+      await showProgress(
+        backupTags(repositoryUri, version),
+        'Backing up image tags'
+      );
     }
-    progress.next();
 
-    // Finish
-    progress.updateCurrentStep('Deployment complete');
     logger.success(
       `Successfully deployed ${lambdaName} to ${envConfig.stackName}`
     );
@@ -321,10 +305,8 @@ async function deployLambda(
     logger.info(`  - v${version}`);
     logger.info(`  - sha-${gitSha}`);
 
-    progress.complete();
     DeploymentMetrics.endDeploy(true);
   } catch (error) {
-    progress.complete();
     DeploymentMetrics.endDeploy(false);
     if (error instanceof Error) {
       throw error;
