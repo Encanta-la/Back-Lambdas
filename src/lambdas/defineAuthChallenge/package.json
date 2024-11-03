@@ -1,0 +1,21 @@
+{
+  "name": "define-auth-challenge",
+  "version": "1.0.0",
+  "description": "Lambda function for defining Cognito auth challenge",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint . --ext .ts"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.119",
+    "@types/jest": "^29.5.3",
+    "@types/node": "^20.4.5",
+    "jest": "^29.6.2",
+    "ts-jest": "^29.1.1",
+    "typescript": "^5.1.6"
+  }
+}

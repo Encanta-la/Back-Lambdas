@@ -5,8 +5,11 @@
   "scripts": {
     "build": "tsc",
     "deploy:dev": "ts-node src/scripts/deploy-lambda.ts --profile pgcdev --env dev",
+    "deploy:staging": "ts-node src/scripts/deploy-lambda.ts --profile pgcstaging --env staging",
     "deploy:prod": "ts-node src/scripts/deploy-lambda.ts --profile pgcprod --env prod",
-    "deploy:staging": "ts-node src/scripts/deploy-lambda.ts --profile pgcstaging --env staging"
+    "version:patch": "node scripts/version-update.js patch",
+    "version:minor": "node scripts/version-update.js minor",
+    "version:major": "node scripts/version-update.js major"
   },
   "keywords": [],
   "author": "",
@@ -21,6 +24,9 @@
   },
   "dependencies": {
     "@aws-sdk/client-cloudformation": "^3.682.0",
-    "@aws-sdk/credential-provider-ini": "^3.682.0"
+    "@aws-sdk/credential-provider-ini": "^3.682.0",
+    "chalk": "^5.3.0",
+    "enquirer": "^2.4.1",
+    "ora": "^5.4.1"
   }
 }
