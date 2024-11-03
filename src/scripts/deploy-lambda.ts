@@ -212,6 +212,20 @@ async function getRepositoryUri(
   return repositoryUri;
 }
 
+async function runLambdaTests(lambdaPath: string): Promise<boolean> {
+  try {
+    const testCommand = `npm test --prefix ${lambdaPath}`;
+    await executeCommand(testCommand);
+    return true;
+  } catch (error) {
+    logger.error('Tests failed!');
+    if (error instanceof Error) {
+      logger.error(error.message);
+    }
+    return false;
+  }
+}
+
 async function deployLambda(
   profile: string,
   envConfig: (typeof environments)[keyof typeof environments],
@@ -220,7 +234,19 @@ async function deployLambda(
 ) {
   const lambdaPath = path.join(getProjectRoot(), 'src', 'lambdas', lambdaName);
 
-  // Primeiro checkAndUpdateVersion
+  // Executa os testes primeiro
+  logger.info('Running tests...');
+  const testsPass = await showProgress(
+    runLambdaTests(lambdaPath),
+    'Running lambda tests'
+  );
+
+  if (!testsPass) {
+    logger.error(`Tests failed for lambda: ${lambdaName}`);
+    return;
+  }
+
+  // Agora checkAndUpdateVersion
   logger.info('Checking version...');
   const shouldContinue = await checkAndUpdateVersion(
     lambdaPath,
