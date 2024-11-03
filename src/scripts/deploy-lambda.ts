@@ -16,6 +16,17 @@ import { logger } from '../utils/logger';
 
 import * as ora from 'ora';
 
+interface DetailedError {
+  type:
+    | 'DEPENDENCY_MISSING'
+    | 'PERMISSION_ERROR'
+    | 'COMMAND_ERROR'
+    | 'UNKNOWN_ERROR';
+  message: string;
+  details?: string;
+  command?: string;
+}
+
 interface Args {
   profile: string;
   env: string;
@@ -83,38 +94,102 @@ async function executeCommand(
   const MAX_RETRIES = deployConfig.maxRetries;
   let attempt = 0;
 
+  // Função auxiliar para verificar dependências ausentes
+  function checkForMissingDependency(
+    stderr: string,
+    stdout: string
+  ): DetailedError | null {
+    const errorOutput = (stderr + stdout).toLowerCase();
+
+    // Mapeamento de erros comuns
+    const commonErrors = [
+      {
+        pattern: 'command not found: jq',
+        type: 'DEPENDENCY_MISSING' as const,
+        message:
+          'O comando jq não está instalado. Por favor, instale usando:\n' +
+          '- Mac: brew install jq\n' +
+          '- Ubuntu/Debian: sudo apt-get install jq\n' +
+          '- RHEL/CentOS: sudo yum install jq',
+      },
+      {
+        pattern: 'command not found: aws',
+        type: 'DEPENDENCY_MISSING' as const,
+        message:
+          'AWS CLI não está instalado. Por favor, instale usando:\n' +
+          '- Mac: brew install awscli\n' +
+          '- Ubuntu/Debian: sudo apt-get install awscli\n' +
+          '- Ou siga a documentação oficial: https://aws.amazon.com/cli/',
+      },
+      // Adicione outros padrões de erro conforme necessário
+    ];
+
+    for (const error of commonErrors) {
+      if (errorOutput.includes(error.pattern)) {
+        return {
+          type: error.type,
+          message: error.message,
+          command: command,
+        };
+      }
+    }
+
+    return null;
+  }
+
   while (attempt < MAX_RETRIES) {
     try {
       const result = spawnSync(command, {
         shell: true,
         timeout: deployConfig.timeout,
-        encoding: 'utf-8', // Isso garante que o output será string
+        encoding: 'utf-8',
         ...options,
       });
+
+      // Verifica se há erros de dependências
+      const dependencyError = checkForMissingDependency(
+        result.stderr?.toString() || '',
+        result.stdout?.toString() || ''
+      );
+
+      if (dependencyError) {
+        throw dependencyError;
+      }
 
       if (result.status === 0) {
         return {
           status: result.status,
-          stdout: result.stdout.toString(), // Convertemos explicitamente para string
-          stderr: result.stderr.toString(), // Convertemos explicitamente para string
+          stdout: result.stdout?.toString() || '',
+          stderr: result.stderr?.toString() || '',
         };
       }
 
+      // Se chegou aqui, houve erro na execução do comando
       attempt++;
-      logger.warning(`Command failed, attempt ${attempt}/${MAX_RETRIES}`);
+      logger.warning(`Tentativa ${attempt}/${MAX_RETRIES} falhou`);
+      logger.warning(`Saída de erro: ${result.stderr}`);
+      logger.warning(`Saída padrão: ${result.stdout}`);
     } catch (error: unknown) {
-      // Tipagem explícita do error
       attempt++;
-      // Tratamento seguro do erro com type guard
-      if (error instanceof Error) {
-        logger.warning(`Command failed with error: ${error.message}`);
+
+      // Se for um erro detalhado que identificamos
+      if ((error as DetailedError).type) {
+        const detailedError = error as DetailedError;
+        logger.error(`${detailedError.type}: ${detailedError.message}`);
+
+        // Se for erro de dependência, não faz sentido tentar novamente
+        if (detailedError.type === 'DEPENDENCY_MISSING') {
+          throw new Error(detailedError.message);
+        }
+      } else if (error instanceof Error) {
+        logger.warning(`Erro na execução do comando: ${error.message}`);
       } else {
-        logger.warning(`Command failed with unknown error: ${String(error)}`);
+        logger.warning(`Erro desconhecido: ${String(error)}`);
       }
     }
   }
 
-  throw new Error(`Command failed after ${MAX_RETRIES} attempts: ${command}`);
+  throw new Error(`Comando falhou após ${MAX_RETRIES} tentativas: ${command}`);
 }
 
 async function checkDependencies() {
