@@ -12,20 +12,12 @@ export async function checkAndUpdateVersion(
     const packageJsonPath = path.join(lambdaPath, 'package.json');
     const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
     const currentVersion = packageJson.version;
-    const gitHash = executeCommandWithOutput(
+    const gitSha = executeCommandWithOutput(
       'git rev-parse --short HEAD'
     ).trim();
 
     logger.info(`Current version: ${currentVersion}`);
-    logger.info(`Git hash: ${gitHash}`);
-
-    // Verificar se há alterações não commitadas
-    const gitStatus = executeCommandWithOutput('git status --porcelain');
-    if (gitStatus.trim() !== '') {
-      throw new Error(
-        'Git working directory is not clean. Please commit or stash changes.'
-      );
-    }
+    logger.info(`Git hash: ${gitSha}`);
 
     // Verificar se a tag já existe
     const tagExists = executeCommandWithOutput(
@@ -34,16 +26,43 @@ export async function checkAndUpdateVersion(
 
     if (tagExists) {
       logger.warning(`Version ${currentVersion} already exists as a git tag.`);
-      const { proceed } = await prompt<{ proceed: boolean }>({
-        type: 'confirm',
-        name: 'proceed',
-        message: 'Do you want to proceed with deployment anyway?',
-        initial: false,
+      const { action } = await prompt<{
+        action: 'increment' | 'continue' | 'cancel';
+      }>({
+        type: 'select',
+        name: 'action',
+        message: 'What would you like to do?',
+        choices: [
+          { name: 'increment', message: 'Increment version automatically' },
+          { name: 'continue', message: 'Continue with current version' },
+          { name: 'cancel', message: 'Cancel deployment' },
+        ],
       });
-      return proceed;
+
+      if (action === 'cancel') {
+        return false;
+      }
+
+      if (action === 'increment') {
+        // Incrementar versão
+        const result = spawnSync('npm', ['version', 'patch'], {
+          cwd: lambdaPath,
+          stdio: 'inherit',
+          encoding: 'utf-8',
+        });
+
+        if (result.status !== 0) {
+          throw new Error('Failed to increment version');
+        }
+
+        // Ler a nova versão
+        const updatedPackageJson = JSON.parse(
+          fs.readFileSync(packageJsonPath, 'utf-8')
+        );
+        logger.success(`Version updated to: ${updatedPackageJson.version}`);
+      }
     }
 
-    // Se chegou aqui, está tudo ok para continuar
     return true;
   } catch (error: unknown) {
     if (error instanceof Error) {
