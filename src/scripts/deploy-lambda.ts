@@ -31,6 +31,7 @@ interface Args {
   profile: string;
   env: string;
   lambda: string;
+  [key: string]: unknown;
 }
 
 interface DeployMetrics {
@@ -435,11 +436,30 @@ async function deployLambda(
 
 async function main() {
   try {
-    const argv = (await yargs.options({
-      profile: { type: 'string', demandOption: true },
-      env: { type: 'string', demandOption: true },
-      lambda: { type: 'string', demandOption: true },
-    }).argv) as Args;
+    const argv = (await yargs(process.argv.slice(2))
+      .options({
+        profile: {
+          alias: 'p',
+          type: 'string',
+          description: 'AWS profile to use',
+          demandOption: true,
+        },
+        env: {
+          alias: 'e',
+          type: 'string',
+          description: 'Environment to deploy to',
+          demandOption: true,
+        },
+        lambda: {
+          alias: 'l',
+          type: 'string',
+          description: 'Lambda function to deploy',
+          demandOption: true,
+        },
+      })
+      .help()
+      .alias('help', 'h')
+      .parseAsync()) as Args;
 
     await checkDependencies();
     const envValidated = await validateEnvironment(argv.env);
