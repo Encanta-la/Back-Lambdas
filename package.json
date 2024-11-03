@@ -7,9 +7,9 @@
     "deploy:dev": "ts-node src/scripts/deploy-lambda.ts --profile pgcdev --env dev",
     "deploy:staging": "ts-node src/scripts/deploy-lambda.ts --profile pgcstaging --env staging",
     "deploy:prod": "ts-node src/scripts/deploy-lambda.ts --profile pgcprod --env prod",
-    "version:patch": "node scripts/version-update.js patch",
-    "version:minor": "node scripts/version-update.js minor",
-    "version:major": "node scripts/version-update.js major"
+    "version:patch": "ts-node src/scripts/version-update.ts patch",
+    "version:minor": "ts-node src/scripts/version-update.ts minor",
+    "version:major": "ts-node src/scripts/version-update.ts major"
   },
   "keywords": [],
   "author": "",
