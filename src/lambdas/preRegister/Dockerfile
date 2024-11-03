@@ -1,5 +1,5 @@
 # Estágio de build  
-FROM node:20.10-alpine AS builder  
+FROM public.ecr.aws/lambda/nodejs:20 AS builder  
 
 WORKDIR /app  
 
@@ -7,14 +7,17 @@ WORKDIR /app
 COPY package*.json ./  
 COPY tsconfig.json ./  
 
-# Instala dependências  
-RUN npm ci  
+# Instala dependências de produção apenas  
+RUN npm ci --production  
 
 # Copia código fonte  
 COPY src/ ./src/  
 
-# Compila TypeScript  
-RUN npm run build  
+# Instala dependências de desenvolvimento temporariamente para build  
+RUN npm ci && \
+  npm run build && \
+  rm -rf node_modules && \
+  npm ci --production  
 
 # Estágio final  
 FROM public.ecr.aws/lambda/nodejs:20  
