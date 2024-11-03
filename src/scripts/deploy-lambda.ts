@@ -19,7 +19,7 @@ import * as ora from 'ora';
 interface Args {
   profile: string;
   env: string;
-  lambda?: string;
+  lambda: string;
 }
 
 interface DeployMetrics {
@@ -187,29 +187,43 @@ async function showProgress<T>(
 }
 
 async function getRepositoryUri(
-  client: CloudFormationClient,
-  stackName: string
+  cfClient: CloudFormationClient,
+  env: string, // agora recebe o ambiente diretamente
+  lambdaName: string
 ): Promise<string> {
-  const command = new DescribeStacksCommand({
-    StackName: stackName,
-  });
+  try {
+    const ecrStackName = `EcrStack-${env}`; // Constrói o nome da stack ECR
 
-  const response = await client.send(command);
-  const stack = response.Stacks?.[0];
+    const response = await cfClient.send(
+      new DescribeStacksCommand({
+        StackName: ecrStackName,
+      })
+    );
 
-  if (!stack) {
-    throw new Error(`Stack ${stackName} not found`);
+    const stack = response.Stacks?.[0];
+    if (!stack) {
+      throw new Error(`Stack ${ecrStackName} not found`);
+    }
+
+    // Procura pelo output específico da lambda
+    const repositoryUri = stack.Outputs?.find(
+      (output) => output.OutputKey === `${lambdaName}RepositoryUri`
+    )?.OutputValue;
+
+    if (!repositoryUri) {
+      throw new Error(
+        `Repository URI not found for lambda ${lambdaName} in stack ${ecrStackName}`
+      );
+    }
+
+    return repositoryUri;
+  } catch (error) {
+    throw new Error(
+      `Failed to get repository URI: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
   }
-
-  const repositoryUri = stack.Outputs?.find(
-    (output) => output.OutputKey === 'RepositoryUri'
-  )?.OutputValue;
-
-  if (!repositoryUri) {
-    throw new Error('Repository URI not found in stack outputs');
-  }
-
-  return repositoryUri;
 }
 
 async function runLambdaTests(lambdaPath: string): Promise<boolean> {
@@ -349,7 +363,7 @@ async function main() {
     const argv = (await yargs.options({
       profile: { type: 'string', demandOption: true },
       env: { type: 'string', demandOption: true },
-      lambda: { type: 'string' },
+      lambda: { type: 'string', demandOption: true },
     }).argv) as Args;
 
     await checkDependencies();
@@ -377,7 +391,7 @@ async function main() {
     });
 
     const repositoryUri = await showProgress(
-      getRepositoryUri(cfClient, envConfig.stackName),
+      getRepositoryUri(cfClient, argv.env, argv.lambda),
       'Getting repository URI'
     );
 
