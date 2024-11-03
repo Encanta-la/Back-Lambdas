@@ -32,41 +32,66 @@ export async function checkAndUpdateVersion(
     logger.info(`Current version: ${currentVersion}`);
     logger.info(`Git hash: ${gitSha}`);
 
-    // Verificar imagens existentes no ECR
-    const { action } = await prompt<{
-      action: 'increment' | 'continue' | 'cancel';
-    }>({
-      type: 'select',
-      name: 'action',
-      message: `Current version is ${currentVersion}. What would you like to do?`,
-      choices: [
-        { name: 'increment', message: 'Increment version automatically' },
-        { name: 'continue', message: 'Continue with current version' },
-        { name: 'cancel', message: 'Cancel deployment' },
-      ],
-    });
+    // Buscar todas as tags remotas
+    executeCommandWithOutput('git fetch --tags');
 
-    if (action === 'cancel') {
-      return false;
-    }
+    // Verificar se a tag existe (local ou remota)
+    const tagExists =
+      executeCommandWithOutput(`git tag -l v${currentVersion}`).trim() ||
+      executeCommandWithOutput(
+        `git ls-remote --tags origin refs/tags/v${currentVersion}`
+      ).trim();
 
-    if (action === 'increment') {
-      // Incrementar versão
-      const result = spawnSync('npm', ['version', 'patch'], {
-        cwd: lambdaPath,
-        stdio: 'inherit',
-        encoding: 'utf-8',
+    if (tagExists) {
+      logger.warning(`Version ${currentVersion} already exists as a git tag.`);
+      const { action } = await prompt<{
+        action: 'increment' | 'continue' | 'cancel';
+      }>({
+        type: 'select',
+        name: 'action',
+        message: 'What would you like to do?',
+        choices: [
+          { name: 'increment', message: 'Increment version automatically' },
+          { name: 'continue', message: 'Continue with current version' },
+          { name: 'cancel', message: 'Cancel deployment' },
+        ],
       });
 
-      if (result.status !== 0) {
-        throw new Error('Failed to increment version');
+      if (action === 'cancel') {
+        return false;
       }
 
-      // Ler a nova versão
-      const updatedPackageJson = JSON.parse(
-        fs.readFileSync(packageJsonPath, 'utf-8')
+      if (action === 'increment') {
+        // Incrementar versão
+        const result = spawnSync('npm', ['version', 'patch'], {
+          cwd: lambdaPath,
+          stdio: 'inherit',
+          encoding: 'utf-8',
+        });
+
+        if (result.status !== 0) {
+          throw new Error('Failed to increment version');
+        }
+
+        // Ler a nova versão
+        const updatedPackageJson = JSON.parse(
+          fs.readFileSync(packageJsonPath, 'utf-8')
+        );
+        logger.success(`Version updated to: ${updatedPackageJson.version}`);
+
+        // Criar e enviar a nova tag
+        executeCommandWithOutput(
+          `git tag -a v${updatedPackageJson.version} -m "Version ${updatedPackageJson.version}"`
+        );
+        executeCommandWithOutput('git push --tags');
+      }
+    } else {
+      // Se a tag não existe, criar ela
+      executeCommandWithOutput(
+        `git tag -a v${currentVersion} -m "Version ${currentVersion}"`
       );
-      logger.success(`Version updated to: ${updatedPackageJson.version}`);
+      executeCommandWithOutput('git push --tags');
+      logger.info(`Created new tag v${currentVersion}`);
     }
 
     return true;
