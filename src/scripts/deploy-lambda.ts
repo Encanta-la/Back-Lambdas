@@ -1,37 +1,18 @@
-import { spawnSync, SpawnSyncOptions } from 'child_process';
-import { environments } from './config/environments';
-import { deployConfig } from './config/deployConfig';
+import { spawnSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as yargs from 'yargs';
+import yargs from 'yargs';
+import * as ora from 'ora';
+import { fromIni } from '@aws-sdk/credential-provider-ini';
 import {
   CloudFormationClient,
   DescribeStacksCommand,
 } from '@aws-sdk/client-cloudformation';
-import { fromIni } from '@aws-sdk/credential-provider-ini';
-import { getProjectRoot } from '../utils/getRoot';
-import { checkAndUpdateVersion } from '../utils/versionChecker';
 import { prompt } from 'enquirer';
+import { getProjectRoot } from '../utils/getRoot';
+import { deployConfig } from './config/deployConfig';
+import { environments } from './config/environments';
 import { logger } from '../utils/logger';
-
-import * as ora from 'ora';
-
-interface DetailedError {
-  type:
-    | 'DEPENDENCY_MISSING'
-    | 'PERMISSION_ERROR'
-    | 'COMMAND_ERROR'
-    | 'UNKNOWN_ERROR';
-  message: string;
-  details?: string;
-  command?: string;
-}
-
-interface Args {
-  profile: string;
-  env: string;
-  lambda: string;
-}
 
 interface DeployMetrics {
   startTime: number;
@@ -41,12 +22,6 @@ interface DeployMetrics {
   environment: string;
   version: string;
   lambdaName: string;
-}
-
-interface CommandResult {
-  status: number;
-  stdout: string;
-  stderr: string;
 }
 
 class DeploymentMetrics {
@@ -74,34 +49,49 @@ class DeploymentMetrics {
   }
 }
 
+const LAMBDA_STATES = {
+  Pending: 'Pending',
+  Active: 'Active',
+  Inactive: 'Inactive',
+  Failed: 'Failed',
+} as const;
+
+type LambdaState = (typeof LAMBDA_STATES)[keyof typeof LAMBDA_STATES];
+
+interface Args {
+  profile: string;
+  env: string;
+  lambda: string;
+  [key: string]: unknown;
+}
+
+interface DetailedError {
+  type: string;
+  message: string;
+  command?: string;
+}
+
 function executeCommandWithOutput(command: string): string {
   const result = spawnSync(command, {
     shell: true,
     encoding: 'utf-8',
   });
-
-  if (result.status !== 0) {
-    throw new Error(`Command failed: ${command}`);
-  }
-
-  return result.stdout.trim();
+  return result.stdout?.toString().trim() || '';
 }
 
 async function executeCommand(
   command: string,
-  options: SpawnSyncOptions = {}
-): Promise<CommandResult> {
+  options: Record<string, any> = {},
+  attempt = 1
+): Promise<{ status: number; stdout: string; stderr: string }> {
   const MAX_RETRIES = deployConfig.maxRetries;
-  let attempt = 0;
 
-  // Função auxiliar para verificar dependências ausentes
   function checkForMissingDependency(
     stderr: string,
     stdout: string
   ): DetailedError | null {
     const errorOutput = (stderr + stdout).toLowerCase();
 
-    // Mapeamento de erros comuns
     const commonErrors = [
       {
         pattern: 'command not found: jq',
@@ -121,7 +111,6 @@ async function executeCommand(
           '- Ubuntu/Debian: sudo apt-get install awscli\n' +
           '- Ou siga a documentação oficial: https://aws.amazon.com/cli/',
       },
-      // Adicione outros padrões de erro conforme necessário
     ];
 
     for (const error of commonErrors) {
@@ -146,7 +135,6 @@ async function executeCommand(
         ...options,
       });
 
-      // Verifica se há erros de dependências
       const dependencyError = checkForMissingDependency(
         result.stderr?.toString() || '',
         result.stdout?.toString() || ''
@@ -164,7 +152,6 @@ async function executeCommand(
         };
       }
 
-      // Se chegou aqui, houve erro na execução do comando
       attempt++;
       logger.warning(`Tentativa ${attempt}/${MAX_RETRIES} falhou`);
       logger.warning(`Saída de erro: ${result.stderr}`);
@@ -172,12 +159,10 @@ async function executeCommand(
     } catch (error: unknown) {
       attempt++;
 
-      // Se for um erro detalhado que identificamos
       if ((error as DetailedError).type) {
         const detailedError = error as DetailedError;
         logger.error(`${detailedError.type}: ${detailedError.message}`);
 
-        // Se for erro de dependência, não faz sentido tentar novamente
         if (detailedError.type === 'DEPENDENCY_MISSING') {
           throw new Error(detailedError.message);
         }
@@ -192,6 +177,22 @@ async function executeCommand(
   throw new Error(`Comando falhou após ${MAX_RETRIES} tentativas: ${command}`);
 }
 
+async function verifyDockerSetup() {
+  try {
+    await executeCommand('docker buildx version');
+    await executeCommand(
+      'docker buildx inspect default || docker buildx create --name default --use'
+    );
+    return true;
+  } catch (error) {
+    logger.error('Docker buildx not properly configured');
+    if (error instanceof Error) {
+      logger.error(error.message);
+    }
+    return false;
+  }
+}
+
 async function checkDependencies() {
   const dependencies = ['docker', 'git', 'aws'];
   for (const dep of dependencies) {
@@ -199,6 +200,72 @@ async function checkDependencies() {
     if (result.status !== 0) {
       throw new Error(`Required dependency "${dep}" is not installed`);
     }
+  }
+
+  const buildxOk = await verifyDockerSetup();
+  if (!buildxOk) {
+    throw new Error(
+      'Docker buildx setup is required for multi-architecture builds'
+    );
+  }
+}
+
+async function checkImageSize(imageName: string): Promise<boolean> {
+  const result = await executeCommand(
+    `docker image inspect ${imageName} --format='{{.Size}}'`
+  );
+  const sizeInBytes = parseInt(result.stdout);
+  const sizeInGB = sizeInBytes / (1024 * 1024 * 1024);
+
+  if (sizeInGB > 10) {
+    throw new Error(
+      `Image size (${sizeInGB.toFixed(2)}GB) exceeds Lambda limit of 10GB`
+    );
+  }
+  return true;
+}
+
+function validateECREndpoint(repositoryUri: string): void {
+  if (repositoryUri.includes('ecr-fips')) {
+    throw new Error(
+      'Lambda does not support Amazon ECR FIPS endpoints for container images'
+    );
+  }
+}
+
+async function validateECRPermissions(
+  repositoryUri: string,
+  profile: string
+): Promise<void> {
+  try {
+    const repositoryName = repositoryUri.split('/').pop();
+    const command = `aws ecr get-repository-policy --repository-name ${repositoryName} --profile ${profile}`;
+
+    await executeCommand(command);
+  } catch (error) {
+    logger.warning(
+      'ECR repository policy not found. Adding required permissions...'
+    );
+
+    const policy = {
+      Version: '2012-10-17',
+      Statement: [
+        {
+          Sid: 'LambdaECRImageRetrievalPolicy',
+          Effect: 'Allow',
+          Principal: {
+            Service: 'lambda.amazonaws.com',
+          },
+          Action: ['ecr:BatchGetImage', 'ecr:GetDownloadUrlForLayer'],
+        },
+      ],
+    };
+
+    const setCommand = `aws ecr set-repository-policy --repository-name ${repositoryUri
+      .split('/')
+      .pop()} --policy-text '${JSON.stringify(policy)}' --profile ${profile}`;
+
+    await executeCommand(setCommand);
   }
 }
 
@@ -263,11 +330,11 @@ async function showProgress<T>(
 
 async function getRepositoryUri(
   cfClient: CloudFormationClient,
-  env: string, // agora recebe o ambiente diretamente
+  env: string,
   lambdaName: string
 ): Promise<string> {
   try {
-    const ecrStackName = `EcrStack-${env}`; // Constrói o nome da stack ECR
+    const ecrStackName = `EcrStack-${env}`;
 
     const response = await cfClient.send(
       new DescribeStacksCommand({
@@ -280,7 +347,6 @@ async function getRepositoryUri(
       throw new Error(`Stack ${ecrStackName} not found`);
     }
 
-    // Procura pelo output específico da lambda
     const repositoryUri = stack.Outputs?.find(
       (output) => output.OutputKey === `${lambdaName}RepositoryUri`
     )?.OutputValue;
@@ -321,9 +387,12 @@ async function deployLambda(
   lambdaName: string,
   repositoryUri: string
 ) {
+  // Verificações iniciais
+  validateECREndpoint(repositoryUri);
+  await validateECRPermissions(repositoryUri, profile);
+
   const lambdaPath = path.join(getProjectRoot(), 'src', 'lambdas', lambdaName);
 
-  // Executa os testes primeiro
   logger.info('Running tests...');
   const testsPass = await showProgress(
     runLambdaTests(lambdaPath),
@@ -335,7 +404,6 @@ async function deployLambda(
     return;
   }
 
-  // Agora checkAndUpdateVersion
   logger.info('Checking version...');
   const shouldContinue = await checkAndUpdateVersion(
     lambdaPath,
@@ -347,7 +415,6 @@ async function deployLambda(
     return;
   }
 
-  // Recarrega o package.json APÓS a atualização da versão
   const packageJson = JSON.parse(
     fs.readFileSync(path.join(lambdaPath, 'package.json'), 'utf-8')
   );
@@ -382,16 +449,24 @@ async function deployLambda(
     logger.info(`Building from path: ${lambdaPath}`);
     await showProgress(
       executeCommand(
-        `docker build -t ${lambdaName.toLowerCase()} ${lambdaPath}`
+        `docker buildx create --use && docker buildx build --platform linux/amd64 \
+        --build-arg LAMBDA_TASK_ROOT=/var/task \
+        -t ${lambdaName.toLowerCase()} \
+        --load \
+        ${lambdaPath}`
       ),
       'Building Docker image'
     );
 
+    await checkImageSize(lambdaName.toLowerCase());
+
     const version = packageJson.version;
     const gitSha = executeCommandWithOutput('git rev-parse --short HEAD');
+
     await showProgress(async () => {
       await executeCommand(
-        `docker tag ${lambdaName.toLowerCase()}:latest ${repositoryUri}:latest`
+        `docker tag ${lambdaName.toLowerCase()}:latest ${repositoryUri}:latest && \
+         docker image inspect ${repositoryUri}:latest --format '{{.Architecture}}' | grep -q 'amd64'`
       );
       await executeCommand(
         `docker tag ${lambdaName.toLowerCase()}:latest ${repositoryUri}:v${version}`
@@ -414,6 +489,21 @@ async function deployLambda(
       );
     }
 
+    logger.info('Waiting for function to become active...');
+    await showProgress(
+      new Promise((resolve) => setTimeout(resolve, 5000)),
+      'Function optimization in progress'
+    );
+
+    try {
+      const functionState = await executeCommand(
+        `aws lambda get-function --function-name ${lambdaName} --profile ${profile} --query 'Configuration.State' --output text`
+      );
+      logger.info(`Function state: ${functionState.stdout}`);
+    } catch (error) {
+      logger.warning('Could not get function state');
+    }
+
     logger.success(
       `Successfully deployed ${lambdaName} to ${envConfig.stackName}`
     );
@@ -426,72 +516,110 @@ async function deployLambda(
     DeploymentMetrics.endDeploy(true);
   } catch (error) {
     DeploymentMetrics.endDeploy(false);
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error(String(error));
+    throw error;
   }
+}
+
+async function checkAndUpdateVersion(
+  lambdaPath: string,
+  stackName: string
+): Promise<boolean> {
+  const packageJsonPath = path.join(lambdaPath, 'package.json');
+  const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+  const currentVersion = packageJson.version;
+
+  logger.info(`Current version: ${currentVersion}`);
+  logger.info(`Target stack: ${stackName}`);
+
+  const { confirmVersion } = await prompt<{ confirmVersion: boolean }>({
+    type: 'confirm',
+    name: 'confirmVersion',
+    message: 'Proceed with deployment?',
+    initial: true,
+  });
+
+  return confirmVersion;
 }
 
 async function main() {
   try {
-    const argv = (await yargs.options({
-      profile: { type: 'string', demandOption: true },
-      env: { type: 'string', demandOption: true },
-      lambda: { type: 'string', demandOption: true },
-    }).argv) as Args;
+    const argv = (await yargs(process.argv.slice(2))
+      .options({
+        profile: {
+          alias: 'p',
+          type: 'string',
+          description: 'AWS profile to use',
+          demandOption: true,
+        },
+        env: {
+          alias: 'e',
+          type: 'string',
+          description: 'Environment to deploy to',
+          demandOption: true,
+        },
+        lambda: {
+          alias: 'l',
+          type: 'string',
+          description: 'Lambda function to deploy',
+          demandOption: true,
+        },
+      })
+      .help()
+      .alias('help', 'h')
+      .parseAsync()) as Args;
 
     await checkDependencies();
-    const envValidated = await validateEnvironment(argv.env);
+    await checkGitStatus();
 
-    if (!envValidated) {
-      logger.warning('Deployment cancelled by user');
+    const shouldContinue = await validateEnvironment(argv.env);
+    if (!shouldContinue) {
+      logger.warning('Deployment cancelled');
       return;
-    }
-
-    if (deployConfig.validateGitStatus) {
-      await checkGitStatus();
     }
 
     const envConfig = environments[argv.env];
     if (!envConfig) {
-      throw new Error(`Invalid environment: ${argv.env}`);
+      throw new Error(`Environment configuration not found for: ${argv.env}`);
     }
 
     const cfClient = new CloudFormationClient({
       region: envConfig.region,
-      credentials: fromIni({
-        profile: argv.profile,
-      }),
+      credentials: fromIni({ profile: argv.profile }),
     });
 
-    const repositoryUri = await showProgress(
-      getRepositoryUri(cfClient, argv.env, argv.lambda),
-      'Getting repository URI'
+    const repositoryUri = await getRepositoryUri(
+      cfClient,
+      argv.env,
+      argv.lambda
     );
 
-    if (argv.lambda) {
-      await deployLambda(argv.profile, envConfig, argv.lambda, repositoryUri);
+    await deployLambda(argv.profile, envConfig, argv.lambda, repositoryUri);
+  } catch (error) {
+    if (error instanceof Error) {
+      logger.error(`Deployment failed: ${error.message}`);
     } else {
-      const lambdasDir = path.join(__dirname, '../lambdas');
-      const lambdaFolders = fs.readdirSync(lambdasDir);
-
-      for (const folder of lambdaFolders) {
-        await deployLambda(argv.profile, envConfig, folder, repositoryUri);
-      }
+      logger.error('Deployment failed with unknown error');
     }
+    process.exit(1);
+  }
+}
 
-    if (deployConfig.metrics) {
-      DeploymentMetrics.printSummary();
-    }
-  } catch (error: unknown) {
+if (require.main === module) {
+  main().catch((error) => {
     if (error instanceof Error) {
       logger.error(`Deployment failed: ${error.message}`);
     } else {
       logger.error(`Deployment failed: ${String(error)}`);
     }
     process.exit(1);
-  }
+  });
 }
 
-main();
+export {
+  deployLambda,
+  checkDependencies,
+  validateEnvironment,
+  checkGitStatus,
+  getRepositoryUri,
+  checkAndUpdateVersion,
+};
