@@ -69,6 +69,7 @@ jobs:
 
       - name: Create deployment
         id: deployment
+        if: github.actor != 'github-actions[bot]'
         uses: chrnorm/deployment-action@v2
         with:
           token: ${{ github.token }}
@@ -182,9 +183,9 @@ jobs:
           git push
 
       - name: Update deployment status
-        if: steps.build_and_push.outcome != 'skipped'
+        if: github.actor != 'github-actions[bot]' && steps.build_and_push.outcome != 'skipped'
         uses: chrnorm/deployment-status@v2
         with:
           token: ${{ github.token }}
-          state: ${{ job.status == 'success' && 'success' || 'failure' }}
+          state: ${{ steps.build_and_push.outcome == 'success' && 'success' || 'failure' }}
           deployment-id: ${{ steps.deployment.outputs.deployment_id }}
