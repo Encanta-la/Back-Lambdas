@@ -95,11 +95,12 @@ jobs:
           cd src/lambdas/${{ matrix.lambda }}  
           npm test
 
-      - name: Check and update version if needed
+      - name: Check and update version
         id: version
         run: |
           cd src/lambdas/${{ matrix.lambda }}  
           CURRENT_VERSION=$(node -p "require('./package.json').version")  
+          echo "Current version: ${CURRENT_VERSION}"  
 
           if [ "${{ github.event_name }}" = "pull_request" ]; then  
             CHANGES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} -- src/lambdas/${{ matrix.lambda }})  
@@ -108,18 +109,26 @@ jobs:
             CHANGES=$(git diff --name-only HEAD~1 HEAD -- src/lambdas/${{ matrix.lambda }})  
           fi  
 
+          # Debug  
+          echo "Changes detected in files: $CHANGES"  
+
+          # Sempre atualiza a versão se houver mudanças, senão mantém a atual  
           if [ ! -z "$CHANGES" ]; then  
             npm version patch --no-git-tag-version  
             NEW_VERSION=$(node -p "require('./package.json').version")  
-            echo "version=${NEW_VERSION}" >> $GITHUB_OUTPUT  
-            echo "version_updated=true" >> $GITHUB_OUTPUT  
+            echo "Changes found, bumping version to ${NEW_VERSION}"  
+            echo "version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"  
           else  
-            echo "version=${CURRENT_VERSION}" >> $GITHUB_OUTPUT  
-            echo "version_updated=false" >> $GITHUB_OUTPUT  
+            echo "No changes found, keeping version ${CURRENT_VERSION}"  
+            echo "version=${CURRENT_VERSION}" >> "$GITHUB_OUTPUT"  
           fi
 
+      - name: Debug version info
+        run: |
+          echo "Lambda: ${{ matrix.lambda }}"  
+          echo "Version to be used: ${{ steps.version.outputs.version }}"
+
       - name: Build and push Docker image
-        if: steps.version.outputs.version_updated == 'true'
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           VERSION: ${{ steps.version.outputs.version }}
@@ -128,12 +137,15 @@ jobs:
           REPO_URI=${ECR_REGISTRY}/${REPO_NAME}  
           GIT_SHA=$(git rev-parse --short HEAD)  
 
+          echo "Building Docker image for ${{ matrix.lambda }} version ${VERSION}"  
           docker build -t ${{ matrix.lambda }}:latest src/lambdas/${{ matrix.lambda }}  
 
+          echo "Tagging image with version ${VERSION}"  
           docker tag ${{ matrix.lambda }}:latest ${REPO_URI}:latest  
           docker tag ${{ matrix.lambda }}:latest ${REPO_URI}:v${VERSION}  
           docker tag ${{ matrix.lambda }}:latest ${REPO_URI}:sha-${GIT_SHA}  
 
+          echo "Pushing images to ECR"  
           docker push ${REPO_URI}:latest  
           docker push ${REPO_URI}:v${VERSION}  
           docker push ${REPO_URI}:sha-${GIT_SHA}
