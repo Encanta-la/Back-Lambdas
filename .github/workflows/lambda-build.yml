@@ -65,6 +65,14 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Create deployment
+        id: deployment
+        uses: chrnorm/deployment-action@v2
+        with:
+          token: ${{ github.token }}
+          environment: ${{ env.ENVIRONMENT }}
+          initial-status: 'in_progress'
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -129,6 +137,7 @@ jobs:
           echo "Version to be used: ${{ steps.version.outputs.version }}"
 
       - name: Build and push Docker image
+        id: build_and_push
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           VERSION: ${{ steps.version.outputs.version }}
@@ -169,3 +178,11 @@ jobs:
           git add src/lambdas/${{ matrix.lambda }}/package.json  
           git commit -m "chore(lambda): bump ${{ matrix.lambda }} version to ${{ steps.version.outputs.version }}"  
           git push
+
+      - name: Update deployment status
+        if: steps.build_and_push.outcome != 'skipped'
+        uses: chrnorm/deployment-status@v2
+        with:
+          token: ${{ github.token }}
+          state: ${{ job.status == 'success' && 'success' || 'failure' }}
+          deployment-id: ${{ steps.deployment.outputs.deployment_id }}
