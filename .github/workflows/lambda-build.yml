@@ -22,7 +22,7 @@ env:
 
 jobs:
   create-deployment:
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true) && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     environment: >-
       ${{  
@@ -76,6 +76,8 @@ jobs:
             'preRegister',
             'verifyAuthChallenge',
           ]
+      fail-fast: false
+
     env:
       AWS_REGION: ${{ needs.create-deployment.outputs.aws_region }}
       AWS_ACCOUNT_ID: ${{ needs.create-deployment.outputs.aws_account_id }}
@@ -168,14 +170,6 @@ jobs:
           docker push ${REPO_URI}:v${VERSION}  
           docker push ${REPO_URI}:sha-${GIT_SHA}
 
-      - name: Update deployment status
-        if: ${{ always() && github.actor != 'github-actions[bot]' && matrix.lambda == matrix.lambda[0] }}
-        uses: chrnorm/deployment-status@v2
-        with:
-          token: ${{ github.token }}
-          state: ${{ job.status == 'success' && 'success' || 'failure' }}
-          deployment-id: ${{ needs.create-deployment.outputs.deployment_id }}
-
       - name: Commit version changes
         if: steps.version.outputs.version_updated == 'true'
         run: |
@@ -184,3 +178,15 @@ jobs:
           git add src/lambdas/${{ matrix.lambda }}/package.json  
           git commit -m "chore(lambda): bump ${{ matrix.lambda }} version to ${{ steps.version.outputs.version }}"  
           git push
+
+  update-deployment:
+    needs: [create-deployment, build-and-push]
+    runs-on: ubuntu-latest
+    if: needs.create-deployment.result != 'skipped'
+    steps:
+      - name: Update deployment status
+        uses: chrnorm/deployment-status@v2
+        with:
+          token: ${{ github.token }}
+          state: ${{ needs.build-and-push.result == 'success' && 'success' || 'failure' }}
+          deployment-id: ${{ needs.create-deployment.outputs.deployment_id }}
