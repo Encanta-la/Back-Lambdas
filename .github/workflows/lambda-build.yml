@@ -132,18 +132,20 @@ jobs:
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           VERSION: ${{ steps.version.outputs.version }}
-          REPO_NAME: ${{ env.ECR_REPOSITORY_PREFIX }}${{ matrix.lambda }}
+          LAMBDA_NAME: ${{ matrix.lambda }}
         run: |
+          LAMBDA_LOWERCASE=$(echo "$LAMBDA_NAME" | tr '[:upper:]' '[:lower:]')  
+          REPO_NAME="${ECR_REPOSITORY_PREFIX}${LAMBDA_LOWERCASE}"  
           REPO_URI=${ECR_REGISTRY}/${REPO_NAME}  
           GIT_SHA=$(git rev-parse --short HEAD)  
 
-          echo "Building Docker image for ${{ matrix.lambda }} version ${VERSION}"  
-          docker build -t ${{ matrix.lambda }}:latest src/lambdas/${{ matrix.lambda }}  
+          echo "Building Docker image for $LAMBDA_NAME version ${VERSION}"  
+          docker build -t ${LAMBDA_LOWERCASE}:latest src/lambdas/${LAMBDA_NAME}  
 
           echo "Tagging image with version ${VERSION}"  
-          docker tag ${{ matrix.lambda }}:latest ${REPO_URI}:latest  
-          docker tag ${{ matrix.lambda }}:latest ${REPO_URI}:v${VERSION}  
-          docker tag ${{ matrix.lambda }}:latest ${REPO_URI}:sha-${GIT_SHA}  
+          docker tag ${LAMBDA_LOWERCASE}:latest ${REPO_URI}:latest  
+          docker tag ${LAMBDA_LOWERCASE}:latest ${REPO_URI}:v${VERSION}  
+          docker tag ${LAMBDA_LOWERCASE}:latest ${REPO_URI}:sha-${GIT_SHA}  
 
           echo "Pushing images to ECR"  
           docker push ${REPO_URI}:latest  
