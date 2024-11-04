@@ -53,12 +53,12 @@ jobs:
       ECR_REPOSITORY_PREFIX: ${{ vars.ECR_REPOSITORY_PREFIX }}
       ENVIRONMENT: >-
         ${{  
-          (github.event_name == 'push' && github.ref_name == 'main') && 'prod' ||  
+          (github.event_name == 'push' && github.ref_name == 'main') && 'production' ||  
           (github.event_name == 'push' && github.ref_name == 'staging') && 'staging' ||  
-          (github.event_name == 'push' && github.ref_name == 'develop') && 'dev' ||  
-          (github.event_name == 'pull_request' && github.base_ref == 'main') && 'prod' ||  
+          (github.event_name == 'push' && github.ref_name == 'develop') && 'development' ||  
+          (github.event_name == 'pull_request' && github.base_ref == 'main') && 'production' ||  
           (github.event_name == 'pull_request' && github.base_ref == 'staging') && 'staging' ||  
-          'dev'  
+          'development'  
         }}
 
     steps:
