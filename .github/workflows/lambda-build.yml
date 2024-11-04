@@ -22,8 +22,8 @@ env:
 
 jobs:
   create-deployment:
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true) && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
+    if: github.actor != 'github-actions[bot]' && (github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true))
     environment: >-
       ${{  
         (github.event_name == 'push' && github.ref_name == 'main') && 'production' ||  
@@ -55,7 +55,6 @@ jobs:
 
       - name: Create deployment
         id: deployment
-        if: github.actor != 'github-actions[bot]'
         uses: chrnorm/deployment-action@v2
         with:
           token: ${{ github.token }}
@@ -182,7 +181,7 @@ jobs:
   update-deployment:
     needs: [create-deployment, build-and-push]
     runs-on: ubuntu-latest
-    if: needs.create-deployment.result != 'skipped'
+    if: needs.create-deployment.result != 'skipped' && needs.build-and-push.result != 'skipped'
     steps:
       - name: Update deployment status
         uses: chrnorm/deployment-status@v2
