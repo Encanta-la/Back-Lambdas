@@ -1,0 +1,127 @@
+name: Lambda Build and Push
+
+on:
+  pull_request:
+    types: [closed]
+    branches: ['main', 'develop', 'staging']
+
+env:
+  NODE_VERSION: '20'
+  DOCKER_BUILDKIT: '1'
+
+jobs:
+  build-and-push:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    # Define o ambiente baseado na branch
+    environment: ${{ github.base_ref == 'main' && 'production' || github.base_ref == 'staging' && 'staging' || 'development' }}
+
+    strategy:
+      matrix:
+        lambda:
+          [
+            'createAuthChallenge',
+            'defineAuthChallenge',
+            'executeRegistration',
+            'preRegister',
+            'verifyAuthChallenge',
+          ]
+
+    env:
+      # Variáveis específicas do ambiente
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+      ECR_REPOSITORY_PREFIX: ${{ vars.ECR_REPOSITORY_PREFIX }}
+      ENVIRONMENT: ${{ github.base_ref == 'main' && 'prod' || github.base_ref == 'staging' && 'staging' || 'dev' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install lambda dependencies
+        run: |
+          cd src/lambdas/${{ matrix.lambda }}  
+          npm ci
+
+      - name: Run lambda tests
+        run: |
+          cd src/lambdas/${{ matrix.lambda }}  
+          npm test
+
+      - name: Check and update version if needed
+        id: version
+        run: |
+          cd src/lambdas/${{ matrix.lambda }}  
+          CURRENT_VERSION=$(node -p "require('./package.json').version")  
+
+          CHANGES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} -- src/lambdas/${{ matrix.lambda }})  
+
+          if [ ! -z "$CHANGES" ]; then  
+            npm version patch --no-git-tag-version  
+            NEW_VERSION=$(node -p "require('./package.json').version")  
+            echo "version=${NEW_VERSION}" >> $GITHUB_OUTPUT  
+            echo "version_updated=true" >> $GITHUB_OUTPUT  
+          else  
+            echo "version=${CURRENT_VERSION}" >> $GITHUB_OUTPUT  
+            echo "version_updated=false" >> $GITHUB_OUTPUT  
+          fi
+
+      - name: Build and push Docker image
+        if: steps.version.outputs.version_updated == 'true'
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          VERSION: ${{ steps.version.outputs.version }}
+          REPO_NAME: ${{ env.ECR_REPOSITORY_PREFIX }}${{ matrix.lambda }}
+        run: |
+          REPO_URI=${ECR_REGISTRY}/${REPO_NAME}  
+          GIT_SHA=$(git rev-parse --short HEAD)  
+
+          docker build -t ${{ matrix.lambda }}:latest src/lambdas/${{ matrix.lambda }}  
+
+          docker tag ${{ matrix.lambda }}:latest ${REPO_URI}:latest  
+          docker tag ${{ matrix.lambda }}:latest ${REPO_URI}:v${VERSION}  
+          docker tag ${{ matrix.lambda }}:latest ${REPO_URI}:sha-${GIT_SHA}  
+
+          docker push ${REPO_URI}:latest  
+          docker push ${REPO_URI}:v${VERSION}  
+          docker push ${REPO_URI}:sha-${GIT_SHA}
+
+      - name: Create backup
+        if: steps.version.outputs.version_updated == 'true'
+        run: |
+          mkdir -p backup/lambda-tags  
+          aws ecr batch-get-image \
+            --repository-name ${{ env.ECR_REPOSITORY_PREFIX }}${{ matrix.lambda }} \
+            --image-ids imageTag=v${{ steps.version.outputs.version }} \
+            | jq -r '.images[].imageManifest' > backup/lambda-tags/backup-$(date +%Y-%m-%d).json
+
+      - name: Commit version changes
+        if: steps.version.outputs.version_updated == 'true'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"  
+          git config --local user.name "github-actions[bot]"  
+          git add src/lambdas/${{ matrix.lambda }}/package.json  
+          git commit -m "chore(lambda): bump ${{ matrix.lambda }} version to ${{ steps.version.outputs.version }}"  
+          git push
