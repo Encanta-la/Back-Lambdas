@@ -16,6 +16,9 @@ permissions:
 env:
   NODE_VERSION: '20'
   DOCKER_BUILDKIT: '1'
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+  ECR_REPOSITORY_PREFIX: ${{ vars.ECR_REPOSITORY_PREFIX }}
 
 jobs:
   create-deployment:
@@ -32,25 +35,31 @@ jobs:
       }}
     outputs:
       deployment_id: ${{ steps.deployment.outputs.deployment_id }}
-      environment: ${{ env.ENVIRONMENT }}
-    env:
-      ENVIRONMENT: >-
-        ${{  
-          (github.event_name == 'push' && github.ref_name == 'main') && 'prod' ||  
-          (github.event_name == 'push' && github.ref_name == 'staging') && 'staging' ||  
-          (github.event_name == 'push' && github.ref_name == 'develop') && 'dev' ||  
-          (github.event_name == 'pull_request' && github.base_ref == 'main') && 'prod' ||  
-          (github.event_name == 'pull_request' && github.base_ref == 'staging') && 'staging' ||  
-          'dev'  
-        }}
+      environment: ${{ steps.set_env.outputs.environment }}
+      aws_region: ${{ env.AWS_REGION }}
+      aws_account_id: ${{ env.AWS_ACCOUNT_ID }}
+      ecr_repository_prefix: ${{ env.ECR_REPOSITORY_PREFIX }}
     steps:
+      - name: Set environment
+        id: set_env
+        run: |
+          ENV_NAME=${{  
+            (github.event_name == 'push' && github.ref_name == 'main') && 'production' ||  
+            (github.event_name == 'push' && github.ref_name == 'staging') && 'staging' ||  
+            (github.event_name == 'push' && github.ref_name == 'develop') && 'development' ||  
+            (github.event_name == 'pull_request' && github.base_ref == 'main') && 'production' ||  
+            (github.event_name == 'pull_request' && github.base_ref == 'staging') && 'staging' ||  
+            'development'  
+          }}  
+          echo "environment=$ENV_NAME" >> $GITHUB_OUTPUT
+
       - name: Create deployment
         id: deployment
         if: github.actor != 'github-actions[bot]'
         uses: chrnorm/deployment-action@v2
         with:
           token: ${{ github.token }}
-          environment: ${{ env.ENVIRONMENT }}
+          environment: ${{ steps.set_env.outputs.environment }}
           initial-status: 'in_progress'
 
   build-and-push:
@@ -68,9 +77,9 @@ jobs:
             'verifyAuthChallenge',
           ]
     env:
-      AWS_REGION: ${{ vars.AWS_REGION }}
-      AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
-      ECR_REPOSITORY_PREFIX: ${{ vars.ECR_REPOSITORY_PREFIX }}
+      AWS_REGION: ${{ needs.create-deployment.outputs.aws_region }}
+      AWS_ACCOUNT_ID: ${{ needs.create-deployment.outputs.aws_account_id }}
+      ECR_REPOSITORY_PREFIX: ${{ needs.create-deployment.outputs.ecr_repository_prefix }}
       ENVIRONMENT: ${{ needs.create-deployment.outputs.environment }}
 
     steps:
