@@ -1,10 +1,8 @@
 name: Lambda Build and Push
 
 on:
-  # Roda quando há push direto nas branches principais
   push:
     branches: ['main', 'staging', 'develop']
-  # Roda quando PR é fechado (merged) para as branches principais
   pull_request:
     types: [closed]
     branches: ['main', 'staging', 'develop']
@@ -20,12 +18,9 @@ env:
   DOCKER_BUILDKIT: '1'
 
 jobs:
-  build-and-push:
-    # Roda se for um push direto OU se for um PR merged
+  create-deployment:
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
     runs-on: ubuntu-latest
-
-    # Define o ambiente baseado no contexto (push ou PR)
     environment: >-
       ${{  
         (github.event_name == 'push' && github.ref_name == 'main') && 'production' ||  
@@ -35,7 +30,33 @@ jobs:
         (github.event_name == 'pull_request' && github.base_ref == 'staging') && 'staging' ||  
         'development'  
       }}
+    outputs:
+      deployment_id: ${{ steps.deployment.outputs.deployment_id }}
+      environment: ${{ env.ENVIRONMENT }}
+    env:
+      ENVIRONMENT: >-
+        ${{  
+          (github.event_name == 'push' && github.ref_name == 'main') && 'prod' ||  
+          (github.event_name == 'push' && github.ref_name == 'staging') && 'staging' ||  
+          (github.event_name == 'push' && github.ref_name == 'develop') && 'dev' ||  
+          (github.event_name == 'pull_request' && github.base_ref == 'main') && 'prod' ||  
+          (github.event_name == 'pull_request' && github.base_ref == 'staging') && 'staging' ||  
+          'dev'  
+        }}
+    steps:
+      - name: Create deployment
+        id: deployment
+        if: github.actor != 'github-actions[bot]'
+        uses: chrnorm/deployment-action@v2
+        with:
+          token: ${{ github.token }}
+          environment: ${{ env.ENVIRONMENT }}
+          initial-status: 'in_progress'
 
+  build-and-push:
+    needs: create-deployment
+    runs-on: ubuntu-latest
+    environment: ${{ needs.create-deployment.outputs.environment }}
     strategy:
       matrix:
         lambda:
@@ -46,35 +67,17 @@ jobs:
             'preRegister',
             'verifyAuthChallenge',
           ]
-
     env:
       AWS_REGION: ${{ vars.AWS_REGION }}
       AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
       ECR_REPOSITORY_PREFIX: ${{ vars.ECR_REPOSITORY_PREFIX }}
-      ENVIRONMENT: >-
-        ${{  
-          (github.event_name == 'push' && github.ref_name == 'main') && 'production' ||  
-          (github.event_name == 'push' && github.ref_name == 'staging') && 'staging' ||  
-          (github.event_name == 'push' && github.ref_name == 'develop') && 'development' ||  
-          (github.event_name == 'pull_request' && github.base_ref == 'main') && 'production' ||  
-          (github.event_name == 'pull_request' && github.base_ref == 'staging') && 'staging' ||  
-          'development'  
-        }}
+      ENVIRONMENT: ${{ needs.create-deployment.outputs.environment }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Create deployment
-        id: deployment
-        if: github.actor != 'github-actions[bot]'
-        uses: chrnorm/deployment-action@v2
-        with:
-          token: ${{ github.token }}
-          environment: ${{ env.ENVIRONMENT }}
-          initial-status: 'in_progress'
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -116,14 +119,11 @@ jobs:
           if [ "${{ github.event_name }}" = "pull_request" ]; then  
             CHANGES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} -- src/lambdas/${{ matrix.lambda }})  
           else  
-            # Para pushes, compare com o commit anterior  
             CHANGES=$(git diff --name-only HEAD~1 HEAD -- src/lambdas/${{ matrix.lambda }})  
           fi  
 
-          # Debug  
           echo "Changes detected in files: $CHANGES"  
 
-          # Sempre atualiza a versão se houver mudanças, senão mantém a atual  
           if [ ! -z "$CHANGES" ]; then  
             npm version patch --no-git-tag-version  
             NEW_VERSION=$(node -p "require('./package.json').version")  
@@ -133,11 +133,6 @@ jobs:
             echo "No changes found, keeping version ${CURRENT_VERSION}"  
             echo "version=${CURRENT_VERSION}" >> "$GITHUB_OUTPUT"  
           fi
-
-      - name: Debug version info
-        run: |
-          echo "Lambda: ${{ matrix.lambda }}"  
-          echo "Version to be used: ${{ steps.version.outputs.version }}"
 
       - name: Build and push Docker image
         id: build_and_push
@@ -164,14 +159,13 @@ jobs:
           docker push ${REPO_URI}:v${VERSION}  
           docker push ${REPO_URI}:sha-${GIT_SHA}
 
-      - name: Create backup
-        if: steps.version.outputs.version_updated == 'true'
-        run: |
-          mkdir -p backup/lambda-tags  
-          aws ecr batch-get-image \
-            --repository-name ${{ env.ECR_REPOSITORY_PREFIX }}${{ matrix.lambda }} \
-            --image-ids imageTag=v${{ steps.version.outputs.version }} \
-            | jq -r '.images[].imageManifest' > backup/lambda-tags/backup-$(date +%Y-%m-%d).json
+      - name: Update deployment status
+        if: ${{ always() && github.actor != 'github-actions[bot]' && matrix.lambda == matrix.lambda[0] }}
+        uses: chrnorm/deployment-status@v2
+        with:
+          token: ${{ github.token }}
+          state: ${{ job.status == 'success' && 'success' || 'failure' }}
+          deployment-id: ${{ needs.create-deployment.outputs.deployment_id }}
 
       - name: Commit version changes
         if: steps.version.outputs.version_updated == 'true'
@@ -181,11 +175,3 @@ jobs:
           git add src/lambdas/${{ matrix.lambda }}/package.json  
           git commit -m "chore(lambda): bump ${{ matrix.lambda }} version to ${{ steps.version.outputs.version }}"  
           git push
-
-      - name: Update deployment status
-        if: github.actor != 'github-actions[bot]' && steps.build_and_push.outcome != 'skipped'
-        uses: chrnorm/deployment-status@v2
-        with:
-          token: ${{ github.token }}
-          state: ${{ steps.build_and_push.outcome == 'success' && 'success' || 'failure' }}
-          deployment-id: ${{ steps.deployment.outputs.deployment_id }}
