@@ -12,6 +12,8 @@ on:
 permissions:
   id-token: write
   contents: write
+  deployments: write
+  statuses: write
 
 env:
   NODE_VERSION: '20'
