@@ -238,9 +238,18 @@ async function cleanupDocker(lambdaName: string) {
   return executeCommand(cleanupCommand);
 }
 
-async function backupTags(repositoryUri: string, version: string) {
+async function backupTags(
+  repositoryUri: string,
+  version: string,
+  profile: string
+) {
   const date = new Date().toISOString().split('T')[0];
-  const backupCommand = `aws ecr batch-get-image --repository-name ${repositoryUri} --image-ids imageTag=v${version} | jq -r '.images[].imageManifest' > backup-${date}.json`;
+
+  // Cria o diretório backup/lambda-tags se não existir
+  const backupDir = 'backup/lambda-tags';
+  await executeCommand(`mkdir -p ${backupDir}`);
+
+  const backupCommand = `aws ecr batch-get-image --profile ${profile} --repository-name ${repositoryUri} --image-ids imageTag=v${version} | jq -r '.images[].imageManifest' > ${backupDir}/backup-${date}.json`;
   return executeCommand(backupCommand);
 }
 
@@ -410,7 +419,7 @@ async function deployLambda(
 
     if (deployConfig.backupTags) {
       await showProgress(
-        backupTags(repositoryUri, version),
+        backupTags(repositoryUri, version, profile),
         'Backing up image tags'
       );
     }

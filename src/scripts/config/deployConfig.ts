@@ -3,6 +3,6 @@ export const deployConfig = {
   timeout: 300000,
   validateGitStatus: true,
   cleanupImages: true,
-  backupTags: true,
+  backupTags: false,
   metrics: true,
 };
