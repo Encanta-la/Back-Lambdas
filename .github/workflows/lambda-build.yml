@@ -1,9 +1,13 @@
 name: Lambda Build and Push
 
 on:
+  # Roda quando há push direto nas branches principais
+  push:
+    branches: ['main', 'staging', 'develop']
+  # Roda quando PR é fechado (merged) para as branches principais
   pull_request:
     types: [closed]
-    branches: ['main', 'develop', 'staging']
+    branches: ['main', 'staging', 'develop']
 
 env:
   NODE_VERSION: '20'
@@ -11,11 +15,20 @@ env:
 
 jobs:
   build-and-push:
-    if: github.event.pull_request.merged == true
+    # Roda se for um push direto OU se for um PR merged
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
     runs-on: ubuntu-latest
 
-    # Define o ambiente baseado na branch
-    environment: ${{ github.base_ref == 'main' && 'production' || github.base_ref == 'staging' && 'staging' || 'development' }}
+    # Define o ambiente baseado no contexto (push ou PR)
+    environment: >-
+      ${{  
+        (github.event_name == 'push' && github.ref_name == 'main') && 'production' ||  
+        (github.event_name == 'push' && github.ref_name == 'staging') && 'staging' ||  
+        (github.event_name == 'push' && github.ref_name == 'develop') && 'development' ||  
+        (github.event_name == 'pull_request' && github.base_ref == 'main') && 'production' ||  
+        (github.event_name == 'pull_request' && github.base_ref == 'staging') && 'staging' ||  
+        'development'  
+      }}
 
     strategy:
       matrix:
@@ -29,11 +42,18 @@ jobs:
           ]
 
     env:
-      # Variáveis específicas do ambiente
       AWS_REGION: ${{ vars.AWS_REGION }}
       AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
       ECR_REPOSITORY_PREFIX: ${{ vars.ECR_REPOSITORY_PREFIX }}
-      ENVIRONMENT: ${{ github.base_ref == 'main' && 'prod' || github.base_ref == 'staging' && 'staging' || 'dev' }}
+      ENVIRONMENT: >-
+        ${{  
+          (github.event_name == 'push' && github.ref_name == 'main') && 'prod' ||  
+          (github.event_name == 'push' && github.ref_name == 'staging') && 'staging' ||  
+          (github.event_name == 'push' && github.ref_name == 'develop') && 'dev' ||  
+          (github.event_name == 'pull_request' && github.base_ref == 'main') && 'prod' ||  
+          (github.event_name == 'pull_request' && github.base_ref == 'staging') && 'staging' ||  
+          'dev'  
+        }}
 
     steps:
       - name: Checkout code
@@ -76,7 +96,12 @@ jobs:
           cd src/lambdas/${{ matrix.lambda }}  
           CURRENT_VERSION=$(node -p "require('./package.json').version")  
 
-          CHANGES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} -- src/lambdas/${{ matrix.lambda }})  
+          if [ "${{ github.event_name }}" = "pull_request" ]; then  
+            CHANGES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} -- src/lambdas/${{ matrix.lambda }})  
+          else  
+            # Para pushes, compare com o commit anterior  
+            CHANGES=$(git diff --name-only HEAD~1 HEAD -- src/lambdas/${{ matrix.lambda }})  
+          fi  
 
           if [ ! -z "$CHANGES" ]; then  
             npm version patch --no-git-tag-version  
