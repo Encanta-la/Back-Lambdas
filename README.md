@@ -7,6 +7,53 @@
 
 Repositório para gerenciamento e deploy de funções AWS Lambda usando Docker e AWS CLI. As imagens são armazenadas no Amazon ECR (Elastic Container Registry).
 
+## Configuração Inicial
+
+### 1. Instalação de Dependências
+
+Primeiro, instale as dependências do repositório principal:
+
+```bash
+npm install
+```
+
+Em seguida, instale as dependências de cada Lambda individualmente:
+
+```bash
+# Entre em cada diretório de Lambda e instale as dependências
+cd src/lambdas/createAuthChallenge && npm install
+cd src/lambdas/defineAuthChallenge && npm install
+cd src/lambdas/executeRegistration && npm install
+cd src/lambdas/preRegister && npm install
+cd src/lambdas/verifyAuthChallenge && npm install
+```
+
+### 2. Configuração do Deploy
+
+O arquivo `scripts/config/deployConfig.ts` permite configurar várias opções do processo de deploy:
+
+```typescript
+export const deployConfig = {
+  // Número máximo de tentativas para comandos que falharem
+  maxRetries: 3,
+
+  // Timeout para execução de comandos (em milliseconds)
+  timeout: 300000,
+
+  // Se deve validar o status do Git antes do deploy
+  validateGitStatus: true,
+
+  // Se deve limpar imagens Docker antigas
+  cleanupImages: true,
+
+  // Se deve fazer backup das tags
+  backupTags: true,
+
+  // Se deve mostrar métricas de deploy
+  metrics: true,
+};
+```
+
 ## Estrutura de Diretórios
 
 ```
