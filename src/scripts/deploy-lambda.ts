@@ -1,4 +1,4 @@
-import { spawn, spawnSync } from 'node:child_process';
+import { SpawnOptions, spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -339,7 +339,7 @@ async function deployLambda(
   lambdaName: string,
   repositoryUri: string
 ) {
-  const lambdaPath = path.join(getProjectRoot(), 'src', 'lambdas', lambdaName);
+  const lambdaPath = join(getProjectRoot(), 'src', 'lambdas', lambdaName);
 
   // Executa os testes primeiro
   logger.info('Running tests...');
@@ -367,7 +367,7 @@ async function deployLambda(
 
   // Recarrega o package.json APÓS a atualização da versão
   const packageJson = JSON.parse(
-    fs.readFileSync(path.join(lambdaPath, 'package.json'), 'utf-8')
+    fs.readFileSync(join(lambdaPath, 'package.json'), 'utf-8')
   );
 
   DeploymentMetrics.startDeploy(
@@ -510,7 +510,7 @@ const main = async () => {
     if (argv.lambda) {
       await deployLambda(argv.profile, envConfig, argv.lambda, repositoryUri);
     } else {
-      const lambdasDir = path.join(__dirname, '../lambdas');
+      const lambdasDir = join(__dirname, '../lambdas');
       const lambdaFolders = fs.readdirSync(lambdasDir);
 
       for (const folder of lambdaFolders) {
