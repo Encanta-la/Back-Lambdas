@@ -82,13 +82,21 @@ jobs:
           environment: ${{ github.ref_name }}-${{ matrix.lambda }}
           initial-status: 'in_progress'
 
+      - name: Get current version
+        id: version
+        run: |
+          cd src/lambdas/${{ matrix.lambda }}  
+          CURRENT_VERSION=$(node -p "require('./package.json').version")  
+          echo "Current version: ${CURRENT_VERSION}"  
+          echo "version=${CURRENT_VERSION}" >> "$GITHUB_OUTPUT"
+
       - name: Build and push Docker image
         id: build_and_push
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          VERSION: ${{ steps.version.outputs.version }}
           LAMBDA_NAME: ${{ matrix.lambda }}
         run: |
-          VERSION=$(node -p "require('./package.json').version")  
           LAMBDA_LOWERCASE=$(echo "$LAMBDA_NAME" | tr '[:upper:]' '[:lower:]')  
           REPO_NAME="${ECR_REPOSITORY_PREFIX}${LAMBDA_LOWERCASE}"  
           REPO_URI=${ECR_REGISTRY}/${REPO_NAME}  
