@@ -16,56 +16,11 @@ permissions:
 env:
   NODE_VERSION: '20'
   DOCKER_BUILDKIT: '1'
-  AWS_REGION: ${{ vars.AWS_REGION }}
-  AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
   ECR_REPOSITORY_PREFIX: ${{ vars.ECR_REPOSITORY_PREFIX }}
 
 jobs:
-  create-deployment:
-    if: (github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)) && github.actor != 'github-actions[bot]'
-    runs-on: ubuntu-latest
-    environment: >-
-      ${{  
-        (github.event_name == 'push' && github.ref_name == 'main') && 'production' ||  
-        (github.event_name == 'push' && github.ref_name == 'staging') && 'staging' ||  
-        (github.event_name == 'push' && github.ref_name == 'develop') && 'development' ||  
-        (github.event_name == 'pull_request' && github.base_ref == 'main') && 'production' ||  
-        (github.event_name == 'pull_request' && github.base_ref == 'staging') && 'staging' ||  
-        'development'  
-      }}
-    outputs:
-      deployment_id: ${{ steps.deployment.outputs.deployment_id }}
-      environment: ${{ steps.set_env.outputs.environment }}
-      aws_region: ${{ env.AWS_REGION }}
-      aws_account_id: ${{ env.AWS_ACCOUNT_ID }}
-      ecr_repository_prefix: ${{ env.ECR_REPOSITORY_PREFIX }}
-    steps:
-      - name: Set environment
-        id: set_env
-        run: |
-          ENV_NAME=${{  
-            (github.event_name == 'push' && github.ref_name == 'main') && 'production' ||  
-            (github.event_name == 'push' && github.ref_name == 'staging') && 'staging' ||  
-            (github.event_name == 'push' && github.ref_name == 'develop') && 'development' ||  
-            (github.event_name == 'pull_request' && github.base_ref == 'main') && 'production' ||  
-            (github.event_name == 'pull_request' && github.base_ref == 'staging') && 'staging' ||  
-            'development'  
-          }}  
-          echo "environment=$ENV_NAME" >> $GITHUB_OUTPUT
-
-      - name: Create deployment
-        id: deployment
-        if: github.actor != 'github-actions[bot]'
-        uses: chrnorm/deployment-action@v2
-        with:
-          token: ${{ github.token }}
-          environment: ${{ steps.set_env.outputs.environment }}
-          initial-status: 'in_progress'
-
   build-and-push:
-    needs: create-deployment
     runs-on: ubuntu-latest
-    environment: ${{ needs.create-deployment.outputs.environment }}
     strategy:
       matrix:
         lambda:
@@ -79,10 +34,9 @@ jobs:
       fail-fast: false
 
     env:
-      AWS_REGION: ${{ needs.create-deployment.outputs.aws_region }}
-      AWS_ACCOUNT_ID: ${{ needs.create-deployment.outputs.aws_account_id }}
-      ECR_REPOSITORY_PREFIX: ${{ needs.create-deployment.outputs.ecr_repository_prefix }}
-      ENVIRONMENT: ${{ needs.create-deployment.outputs.environment }}
+      AWS_REGION: ${{ secrets[format('{0}_AWS_REGION', github.ref_name == 'main' && 'PROD' || github.ref_name == 'staging' && 'STAGE' || 'DEV')] }}
+      AWS_ACCOUNT_ID: ${{ secrets[format('{0}_AWS_ACCOUNT_ID', github.ref_name == 'main' && 'PROD' || github.ref_name == 'staging' && 'STAGE' || 'DEV')] }}
+      ENVIRONMENT: ${{ github.ref_name }}-${{ matrix.lambda }}
 
     steps:
       - name: Checkout code
@@ -99,7 +53,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ secrets[format('{0}_AWS_ROLE_ARN', github.ref_name == 'main' && 'PROD' || github.ref_name == 'staging' && 'STAGE' || 'DEV')] }}
           aws-region: ${{ env.AWS_REGION }}
           audience: sts.amazonaws.com
 
@@ -119,6 +73,14 @@ jobs:
         run: |
           cd src/lambdas/${{ matrix.lambda }}  
           npm test
+
+      - name: Create deployment
+        id: deployment
+        uses: chrnorm/deployment-action@v2
+        with:
+          token: ${{ github.token }}
+          environment: ${{ github.ref_name }}-${{ matrix.lambda }}
+          initial-status: 'in_progress'
 
       - name: Build and push Docker image
         id: build_and_push
@@ -145,14 +107,9 @@ jobs:
           docker push ${REPO_URI}:v${VERSION}  
           docker push ${REPO_URI}:sha-${GIT_SHA}
 
-  update-deployment:
-    needs: [create-deployment, build-and-push]
-    runs-on: ubuntu-latest
-    if: always() && needs.create-deployment.result != 'skipped'
-    steps:
       - name: Update deployment status
         uses: chrnorm/deployment-status@v2
         with:
           token: ${{ github.token }}
           state: ${{ needs.build-and-push.result == 'success' && 'success' || 'failure' }}
-          deployment-id: ${{ needs.create-deployment.outputs.deployment_id }}
+          deployment-id: ${{ steps.deployment.outputs.deployment_id }}
