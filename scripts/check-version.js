@@ -41,7 +41,7 @@ async function main() {
 
     if (!confirm) {
       console.log('Push cancelado pelo usuário.');
-      process.exit(1);
+      process.exit(2); // Código de saída específico para cancelamento pelo usuário
     }
 
     const { versionType } = await prompt({
@@ -59,6 +59,7 @@ async function main() {
     execSync(`git commit -m "chore: bump version to ${newVersion}"`);
 
     console.log(`Versão atualizada para ${newVersion}.`);
+    process.exit(0);
   } catch (error) {
     console.error(`Erro ao atualizar a versão: ${error.message}`);
     process.exit(1);
