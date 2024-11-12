@@ -13,12 +13,16 @@ Repositório para gerenciamento e deploy de funções AWS Lambda usando Docker e
 
 **createAuthChallenge**  
 ![Main Branch - createAuthChallenge](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=main&event=push&name=createAuthChallenge)
+
 **defineAuthChallenge**  
 ![Main Branch - defineAuthChallenge](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=main&event=push&name=defineAuthChallenge)
+
 **executeRegistration**  
 ![Main Branch - executeRegistration](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=main&event=push&name=executeRegistration)
+
 **preRegister**  
 ![Main Branch - preRegister](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=main&event=push&name=preRegister)
+
 **verifyAuthChallenge**  
 ![Main Branch - verifyAuthChallenge](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=main&event=push&name=verifyAuthChallenge)
 
@@ -26,12 +30,16 @@ Repositório para gerenciamento e deploy de funções AWS Lambda usando Docker e
 
 **createAuthChallenge**  
 ![Staging Branch - createAuthChallenge](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=staging&event=push&name=createAuthChallenge)
+
 **defineAuthChallenge**  
 ![Staging Branch - defineAuthChallenge](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=staging&event=push&name=defineAuthChallenge)
+
 **executeRegistration**  
 ![Staging Branch - executeRegistration](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=staging&event=push&name=executeRegistration)
+
 **preRegister**  
 ![Staging Branch - preRegister](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=staging&event=push&name=preRegister)
+
 **verifyAuthChallenge**  
 ![Staging Branch - verifyAuthChallenge](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=staging&event=push&name=verifyAuthChallenge)
 
@@ -39,12 +47,16 @@ Repositório para gerenciamento e deploy de funções AWS Lambda usando Docker e
 
 **createAuthChallenge**  
 ![Develop Branch - createAuthChallenge](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=develop&event=push&name=createAuthChallenge)
+
 **defineAuthChallenge**  
 ![Develop Branch - defineAuthChallenge](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=develop&event=push&name=defineAuthChallenge)
+
 **executeRegistration**  
 ![Develop Branch - executeRegistration](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=develop&event=push&name=executeRegistration)
+
 **preRegister**  
 ![Develop Branch - preRegister](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=develop&event=push&name=preRegister)
+
 **verifyAuthChallenge**  
 ![Develop Branch - verifyAuthChallenge](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=develop&event=push&name=verifyAuthChallenge)
 
