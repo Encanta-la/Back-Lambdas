@@ -31,3 +31,5 @@ export const handler = async (event: ChallengeEvent) => {
     throw error;
   }
 };
+
+//  Teste de mudança
