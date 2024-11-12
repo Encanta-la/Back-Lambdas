@@ -4,7 +4,6 @@ import { spawnSync } from 'child_process';
 import { logger } from './logger';
 
 import Enquirer from 'enquirer';
-const { prompt } = new Enquirer();
 
 function executeCommandWithOutput(command: string): string {
   const result = spawnSync(command, {
@@ -35,7 +34,7 @@ export async function checkAndUpdateVersion(
     logger.info(`Git hash: ${gitSha}`);
 
     // Verificar imagens existentes no ECR
-    const { action } = await prompt<{
+    const { action } = await Enquirer.prompt<{
       action: 'increment' | 'continue' | 'cancel';
     }>({
       type: 'select',
