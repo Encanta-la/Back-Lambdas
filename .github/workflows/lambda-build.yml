@@ -22,8 +22,8 @@ env:
 
 jobs:
   create-deployment:
+    if: (github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)) && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
-    if: github.actor != 'github-actions[bot]' && (github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true))
     environment: >-
       ${{  
         (github.event_name == 'push' && github.ref_name == 'main') && 'production' ||  
@@ -55,6 +55,7 @@ jobs:
 
       - name: Create deployment
         id: deployment
+        if: github.actor != 'github-actions[bot]'
         uses: chrnorm/deployment-action@v2
         with:
           token: ${{ github.token }}
@@ -119,38 +120,13 @@ jobs:
           cd src/lambdas/${{ matrix.lambda }}  
           npm test
 
-      - name: Check and update version
-        id: version
-        run: |
-          cd src/lambdas/${{ matrix.lambda }}  
-          CURRENT_VERSION=$(node -p "require('./package.json').version")  
-          echo "Current version: ${CURRENT_VERSION}"  
-
-          if [ "${{ github.event_name }}" = "pull_request" ]; then  
-            CHANGES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} -- src/lambdas/${{ matrix.lambda }})  
-          else  
-            CHANGES=$(git diff --name-only HEAD~1 HEAD -- src/lambdas/${{ matrix.lambda }})  
-          fi  
-
-          echo "Changes detected in files: $CHANGES"  
-
-          if [ ! -z "$CHANGES" ]; then  
-            npm version patch --no-git-tag-version  
-            NEW_VERSION=$(node -p "require('./package.json').version")  
-            echo "Changes found, bumping version to ${NEW_VERSION}"  
-            echo "version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"  
-          else  
-            echo "No changes found, keeping version ${CURRENT_VERSION}"  
-            echo "version=${CURRENT_VERSION}" >> "$GITHUB_OUTPUT"  
-          fi
-
       - name: Build and push Docker image
         id: build_and_push
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          VERSION: ${{ steps.version.outputs.version }}
           LAMBDA_NAME: ${{ matrix.lambda }}
         run: |
+          VERSION=$(node -p "require('./package.json').version")  
           LAMBDA_LOWERCASE=$(echo "$LAMBDA_NAME" | tr '[:upper:]' '[:lower:]')  
           REPO_NAME="${ECR_REPOSITORY_PREFIX}${LAMBDA_LOWERCASE}"  
           REPO_URI=${ECR_REGISTRY}/${REPO_NAME}  
@@ -169,19 +145,10 @@ jobs:
           docker push ${REPO_URI}:v${VERSION}  
           docker push ${REPO_URI}:sha-${GIT_SHA}
 
-      - name: Commit version changes
-        if: steps.version.outputs.version_updated == 'true'
-        run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"  
-          git config --local user.name "github-actions[bot]"  
-          git add src/lambdas/${{ matrix.lambda }}/package.json  
-          git commit -m "chore(lambda): bump ${{ matrix.lambda }} version to ${{ steps.version.outputs.version }}"  
-          git push
-
   update-deployment:
     needs: [create-deployment, build-and-push]
     runs-on: ubuntu-latest
-    if: needs.create-deployment.result != 'skipped' && needs.build-and-push.result != 'skipped'
+    if: always() && needs.create-deployment.result != 'skipped'
     steps:
       - name: Update deployment status
         uses: chrnorm/deployment-status@v2
