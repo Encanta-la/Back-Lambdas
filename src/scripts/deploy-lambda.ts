@@ -20,7 +20,6 @@ import { getProjectRoot } from '../utils/getRoot.js';
 import { checkAndUpdateVersion } from '../utils/versionChecker.js';
 import { logger } from '../utils/logger.js';
 
-const require = createRequire(import.meta.url);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -510,7 +509,8 @@ const main = async () => {
     if (argv.lambda) {
       await deployLambda(argv.profile, envConfig, argv.lambda, repositoryUri);
     } else {
-      const lambdasDir = join(__dirname, '../lambdas');
+      const projectRoot = getProjectRoot();
+      const lambdasDir = join(projectRoot, 'src', 'lambdas');
       const lambdaFolders = fs.readdirSync(lambdasDir);
 
       for (const folder of lambdaFolders) {
