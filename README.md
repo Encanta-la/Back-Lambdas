@@ -41,6 +41,14 @@ Repositório para gerenciamento e deploy de funções AWS Lambda usando Docker e
 
 ## Configuração Inicial
 
+## Configuração dos Hooks do Git
+
+Antes de começar a trabalhar no repositório, execute o seguinte comando para configurar os hooks do Git:
+
+```bash
+npm run setup-hooks
+```
+
 ### 1. Instalação de Dependências
 
 Primeiro, instale as dependências do repositório principal:

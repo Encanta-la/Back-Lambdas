@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
+    "setup-hooks": "./hooks/setup-hooks.sh",
     "build": "tsc",
     "deploy:dev": "ts-node src/scripts/deploy-lambda.ts --profile pgcdev --env dev",
     "deploy:staging": "ts-node src/scripts/deploy-lambda.ts --profile pgcstaging --env staging",

@@ -1,0 +1,47 @@
+#!/bin/bash
+
+# Obtém a lista de arquivos alterados
+CHANGED_FILES=$(git diff --cached --name-only)
+
+# Diretório das lambdas
+LAMBDA_DIR="src/lambdas"
+
+# Lista de lambdas que tiveram arquivos alterados
+CHANGED_LAMBDAS=()
+
+# Verifica se algum arquivo de lambda foi alterado
+for FILE in $CHANGED_FILES; do
+  if [[ $FILE == $LAMBDA_DIR/* ]]; then
+    LAMBDA_NAME=$(echo $FILE | cut -d'/' -f3)
+    if [[ ! " ${CHANGED_LAMBDAS[@]} " =~ " ${LAMBDA_NAME} " ]]; then
+      CHANGED_LAMBDAS+=("$LAMBDA_NAME")
+    fi
+  fi
+done
+
+# Verifica se a versão foi atualizada para cada lambda alterada
+NEEDS_UPDATE=()
+for LAMBDA in "${CHANGED_LAMBDAS[@]}"; do
+  PACKAGE_JSON="$LAMBDA_DIR/$LAMBDA/package.json"
+  if [[ -f $PACKAGE_JSON ]]; then
+    CURRENT_VERSION=$(node -p "require('./$PACKAGE_JSON').version")
+    PREVIOUS_VERSION=$(git show HEAD:$PACKAGE_JSON | node -p "require('fs').readFileSync(0, 'utf-8')" | node -p "JSON.parse(require('fs').readFileSync(0, 'utf-8')).version")
+    if [[ $CURRENT_VERSION == $PREVIOUS_VERSION ]]; then
+      NEEDS_UPDATE+=("$LAMBDA")
+    fi
+  fi
+done
+
+# Exibe a tabela de lambdas que precisam de atualização de versão
+if [[ ${#NEEDS_UPDATE[@]} -ne 0 ]]; then
+  echo -e "\033[1;31m🚨 Aviso: As seguintes lambdas tiveram arquivos alterados, mas a versão não foi atualizada: 🚨\033[0m"
+  echo -e "\033[1;31m+-------------------------+\033[0m"
+  echo -e "\033[1;31m| Lambda                  |\033[0m"
+  echo -e "\033[1;31m+-------------------------+\033[0m"
+  for LAMBDA in "${NEEDS_UPDATE[@]}"; do
+    printf "\033[1;31m| %-23s |\033[0m\n" "$LAMBDA"
+  done
+  echo -e "\033[1;31m+-------------------------+\033[0m"
+fi
+
+exit 0
