@@ -11,27 +11,27 @@ Repositório para gerenciamento e deploy de funções AWS Lambda usando Docker e
 
 ### Main Branch
 
-![Main Branch - createAuthChallenge](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=main&event=push&name=createAuthChallenge)
-![Main Branch - defineAuthChallenge](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=main&event=push&name=defineAuthChallenge)
-![Main Branch - executeRegistration](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=main&event=push&name=executeRegistration)
-![Main Branch - preRegister](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=main&event=push&name=preRegister)
-![Main Branch - verifyAuthChallenge](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=main&event=push&name=verifyAuthChallenge)
+![Main Branch - createAuthChallenge](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=main&event=push&name=createAuthChallenge&label=createAuthChallenge)
+![Main Branch - defineAuthChallenge](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=main&event=push&name=defineAuthChallenge&label=defineAuthChallenge)
+![Main Branch - executeRegistration](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=main&event=push&name=executeRegistration&label=executeRegistration)
+![Main Branch - preRegister](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=main&event=push&name=preRegister&label=preRegister)
+![Main Branch - verifyAuthChallenge](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=main&event=push&name=verifyAuthChallenge&label=verifyAuthChallenge)
 
 ### Staging Branch
 
-![Staging Branch - createAuthChallenge](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=staging&event=push&name=createAuthChallenge)
-![Staging Branch - defineAuthChallenge](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=staging&event=push&name=defineAuthChallenge)
-![Staging Branch - executeRegistration](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=staging&event=push&name=executeRegistration)
-![Staging Branch - preRegister](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=staging&event=push&name=preRegister)
-![Staging Branch - verifyAuthChallenge](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=staging&event=push&name=verifyAuthChallenge)
+![Staging Branch - createAuthChallenge](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=staging&event=push&name=createAuthChallenge&label=createAuthChallenge)
+![Staging Branch - defineAuthChallenge](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=staging&event=push&name=defineAuthChallenge&label=defineAuthChallenge)
+![Staging Branch - executeRegistration](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=staging&event=push&name=executeRegistration&label=executeRegistration)
+![Staging Branch - preRegister](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=staging&event=push&name=preRegister&label=preRegister)
+![Staging Branch - verifyAuthChallenge](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=staging&event=push&name=verifyAuthChallenge&label=verifyAuthChallenge)
 
 ### Develop Branch
 
-![Develop Branch - createAuthChallenge](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=develop&event=push&name=createAuthChallenge)
-![Develop Branch - defineAuthChallenge](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=develop&event=push&name=defineAuthChallenge)
-![Develop Branch - executeRegistration](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=develop&event=push&name=executeRegistration)
-![Develop Branch - preRegister](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=develop&event=push&name=preRegister)
-![Develop Branch - verifyAuthChallenge](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=develop&event=push&name=verifyAuthChallenge)
+![Develop Branch - createAuthChallenge](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=develop&event=push&name=createAuthChallenge&label=createAuthChallenge)
+![Develop Branch - defineAuthChallenge](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=develop&event=push&name=defineAuthChallenge&label=defineAuthChallenge)
+![Develop Branch - executeRegistration](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=develop&event=push&name=executeRegistration&label=executeRegistration)
+![Develop Branch - preRegister](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=develop&event=push&name=preRegister&label=preRegister)
+![Develop Branch - verifyAuthChallenge](https://github.com/Prime-Corporation/PGC-Back-Lambdas/actions/workflows/lambda-build.yml/badge.svg?branch=develop&event=push&name=verifyAuthChallenge&label=verifyAuthChallenge)
 
 ## Configuração Inicial
 
