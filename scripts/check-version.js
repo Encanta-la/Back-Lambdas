@@ -32,6 +32,14 @@ async function main() {
       process.exit(1);
     }
 
+    // Verifica se o script está sendo executado em um ambiente interativo
+    if (!process.stdin.isTTY) {
+      console.error(
+        'O script não está sendo executado em um ambiente interativo.'
+      );
+      process.exit(1);
+    }
+
     const { confirm } = await prompt({
       type: 'confirm',
       name: 'confirm',
