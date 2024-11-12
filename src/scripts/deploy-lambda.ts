@@ -1,5 +1,4 @@
 import { SpawnOptions, spawnSync } from 'node:child_process';
-import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import * as fs from 'node:fs';
@@ -19,9 +18,6 @@ import { deployConfig } from './config/deployConfig.js';
 import { getProjectRoot } from '../utils/getRoot.js';
 import { checkAndUpdateVersion } from '../utils/versionChecker.js';
 import { logger } from '../utils/logger.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 interface DetailedError {
   type:
