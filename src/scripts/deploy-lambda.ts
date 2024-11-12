@@ -84,13 +84,13 @@ export class DeploymentMetrics {
 }
 
 const executeCommandWithOutput = (command: string): string => {
-  const result = spawn(command, {
+  const result = spawnSync(command, {
     shell: true,
     encoding: 'utf-8',
   });
 
   if (result.status !== 0) {
-    throw new Error(`Command failed: ${command}`);
+    throw new Error(`Command failed: ${command}\n${result.stderr}`);
   }
 
   return result.stdout.trim();
