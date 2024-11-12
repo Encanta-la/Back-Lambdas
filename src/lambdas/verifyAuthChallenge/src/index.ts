@@ -32,4 +32,4 @@ export const handler = async (event: ChallengeEvent) => {
   }
 };
 
-//  Teste de mudança 2
+//  Teste de mudança 3
