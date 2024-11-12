@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
+    "lambda:update": "ts-node src/scripts/interactive-version-update.ts",
     "setup-hooks": "./hooks/setup-hooks.sh",
     "build": "tsc",
     "deploy:dev": "ts-node src/scripts/deploy-lambda.ts --profile pgcdev --env dev",
@@ -27,14 +28,14 @@
     "ts-jest": "^29.2.5",
     "ts-node": "^10.9.2",
     "typescript": "~5.6.3",
-    "yargs": "^17.7.2"
+    "yargs": "^17.7.2",
+    "enquirer": "^2.4.1"
   },
   "dependencies": {
     "@aws-sdk/client-cloudformation": "^3.682.0",
     "@aws-sdk/credential-provider-ini": "^3.682.0",
     "chalk": "^5.3.0",
     "cli-progress": "^3.12.0",
-    "enquirer": "^2.4.1",
     "ora": "^5.4.1",
     "typecript": "^0.0.1-security"
   }
