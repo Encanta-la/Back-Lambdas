@@ -1,20 +1,28 @@
-import { spawnSync, SpawnSyncOptions } from 'child_process';
-import { environments } from './config/environments';
-import { deployConfig } from './config/deployConfig';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as yargs from 'yargs';
+import { spawn, spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+import * as fs from 'node:fs';
+
+import yargs from 'yargs';
+import { hideBin } from 'yargs/helpers';
 import {
   CloudFormationClient,
   DescribeStacksCommand,
 } from '@aws-sdk/client-cloudformation';
 import { fromIni } from '@aws-sdk/credential-provider-ini';
-import { getProjectRoot } from '../utils/getRoot';
-import { checkAndUpdateVersion } from '../utils/versionChecker';
-import { prompt } from 'enquirer';
-import { logger } from '../utils/logger';
+import Enquirer from 'enquirer';
+import ora from 'ora';
 
-import * as ora from 'ora';
+import { environments } from './config/environments.js';
+import { deployConfig } from './config/deployConfig.js';
+import { getProjectRoot } from '../utils/getRoot.js';
+import { checkAndUpdateVersion } from '../utils/versionChecker.js';
+import { logger } from '../utils/logger.js';
+
+const require = createRequire(import.meta.url);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 interface DetailedError {
   type:
@@ -50,7 +58,7 @@ interface CommandResult {
   stderr: string;
 }
 
-class DeploymentMetrics {
+export class DeploymentMetrics {
   private static metrics: DeployMetrics[] = [];
 
   static startDeploy(lambdaName: string, env: string, version: string) {
@@ -75,8 +83,8 @@ class DeploymentMetrics {
   }
 }
 
-function executeCommandWithOutput(command: string): string {
-  const result = spawnSync(command, {
+const executeCommandWithOutput = (command: string): string => {
+  const result = spawn(command, {
     shell: true,
     encoding: 'utf-8',
   });
@@ -86,12 +94,12 @@ function executeCommandWithOutput(command: string): string {
   }
 
   return result.stdout.trim();
-}
+};
 
-async function executeCommand(
+const executeCommand = async (
   command: string,
-  options: SpawnSyncOptions = {}
-): Promise<CommandResult> {
+  options: SpawnOptions = {}
+): Promise<CommandResult> => {
   const MAX_RETRIES = deployConfig.maxRetries;
   let attempt = 0;
 
@@ -191,7 +199,7 @@ async function executeCommand(
   }
 
   throw new Error(`Comando falhou após ${MAX_RETRIES} tentativas: ${command}`);
-}
+};
 
 async function checkDependencies() {
   const dependencies = ['docker', 'git', 'aws'];
@@ -222,7 +230,7 @@ async function validateEnvironment(env: string) {
   }
 
   if (env === 'prod') {
-    const { confirm } = await prompt<{ confirm: boolean }>({
+    const { confirm } = await Enquirer.prompt<{ confirm: boolean }>({
       type: 'confirm',
       name: 'confirm',
       message: '⚠️ You are deploying to PRODUCTION. Are you sure?',
@@ -443,9 +451,9 @@ async function deployLambda(
   }
 }
 
-async function main() {
+const main = async () => {
   try {
-    const argv = (await yargs(process.argv.slice(2))
+    const argv = (await yargs(hideBin(process.argv))
       .options({
         profile: {
           alias: 'p',
@@ -521,6 +529,8 @@ async function main() {
     }
     process.exit(1);
   }
-}
+};
 
-main();
+(async () => {
+  await main();
+})();

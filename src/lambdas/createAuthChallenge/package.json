@@ -1,6 +1,6 @@
 {
   "name": "createauthchallenge",
-  "version": "1.0.2",
+  "version": "1.0.4",
   "main": "jest.config.js",
   "scripts": {
     "build": "tsc",

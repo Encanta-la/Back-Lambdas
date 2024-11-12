@@ -1,8 +1,10 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { spawnSync } from 'child_process';
-import { prompt } from 'enquirer';
 import { logger } from './logger';
+
+import Enquirer from 'enquirer';
+const { prompt } = new Enquirer();
 
 function executeCommandWithOutput(command: string): string {
   const result = spawnSync(command, {

@@ -2,41 +2,44 @@
   "name": "primelambdas",
   "version": "1.0.0",
   "main": "index.js",
+  "type": "module",
   "scripts": {
-    "lambda:update": "ts-node src/scripts/interactive-version-update.ts",
-    "setup-hooks": "./hooks/setup-hooks.sh",
-    "build": "tsc",
-    "deploy:dev": "ts-node src/scripts/deploy-lambda.ts --profile pgcdev --env dev",
-    "deploy:staging": "ts-node src/scripts/deploy-lambda.ts --profile pgcstaging --env staging",
-    "deploy:prod": "ts-node src/scripts/deploy-lambda.ts --profile pgcprod --env prod",
-    "version:patch": "ts-node src/scripts/version-update.ts patch",
-    "version:minor": "ts-node src/scripts/version-update.ts minor",
-    "version:major": "ts-node src/scripts/version-update.ts major"
+    "build": "swc src -d dist",
+    "lambda:update": "tsx src/scripts/interactive-version-update.ts",
+    "deploy:dev": "tsx src/scripts/deploy-lambda --profile pgcdev --env dev",
+    "deploy:staging": "tsx src/scripts/deploy-lambda --profile pgcstaging --env staging",
+    "deploy:prod": "tsx src/scripts/deploy-lambda --profile pgcprod --env prod",
+    "version:patch": "tsx src/scripts/version-update patch",
+    "version:minor": "tsx src/scripts/version-update minor",
+    "version:major": "tsx src/scripts/version-update major"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "devDependencies": {
+    "@swc/cli": "^0.5.0",
+    "@swc/core": "^1.9.2",
+    "@tsconfig/node20": "^20.1.4",
+    "@tsconfig/recommended": "^1.0.8",
+    "@tsconfig/strictest": "^2.0.5",
     "@types/cli-progress": "^3.11.6",
     "@types/jest": "^29.5.14",
     "@types/mocha": "^10.0.9",
-    "@types/node": "^22.8.7",
+    "@types/node": "^22.9.0",
     "@types/yargs": "^17.0.33",
+    "enquirer": "^2.4.1",
     "eslint": "^9.14.0",
     "jest": "^29.7.0",
     "ts-jest": "^29.2.5",
-    "ts-node": "^10.9.2",
-    "typescript": "~5.6.3",
-    "yargs": "^17.7.2",
-    "enquirer": "^2.4.1"
+    "tsx": "^4.19.2",
+    "yargs": "^17.7.2"
   },
   "dependencies": {
     "@aws-sdk/client-cloudformation": "^3.682.0",
     "@aws-sdk/credential-provider-ini": "^3.682.0",
     "chalk": "^5.3.0",
     "cli-progress": "^3.12.0",
-    "ora": "^5.4.1",
-    "typecript": "^0.0.1-security"
+    "ora": "^5.4.1"
   }
 }
