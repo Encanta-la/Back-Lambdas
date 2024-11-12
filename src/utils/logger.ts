@@ -6,3 +6,5 @@ export const logger = {
     console.log(`\x1b[33m[WARNING]\x1b[0m ${message}`),
   error: (message: string) => console.log(`\x1b[31m[ERROR]\x1b[0m ${message}`),
 };
+
+// Teste
